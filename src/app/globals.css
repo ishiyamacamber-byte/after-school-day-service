@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rdp-accent-color: #2563eb;
+  --rdp-background-color: #eff6ff;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+.apply-calendar .rdp-root {
+  --rdp-accent-color: #2563eb;
+  --rdp-day_button-border-radius: 12px;
+  margin: 0 auto;
+}
+
+.apply-calendar .rdp-day_button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}

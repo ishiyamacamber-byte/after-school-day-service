@@ -1,0 +1,3 @@
+login_id,name,monthly_limit,allowed_facilities,password,default_sun,default_mon,default_tue,default_wed,default_thu,default_fri,default_sat
+user001,山田太郎,12,オーパ|セカンド,password,,オーパ,セカンド,オーパ,セカンド,オーパ,
+user002,鈴木花子,8,サード|ネクスト,init123,,サード,ネクスト,サード,ネクスト,サード,

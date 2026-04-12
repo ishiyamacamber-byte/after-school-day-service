@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 利用者（管理者は role = ADMIN）
+model User {
+  id               String   @id @default(cuid())
+  name             String
+  loginId          String   @unique @map("login_id")
+  passwordHash     String   @map("password_hash")
+  /// 曜日キー "0"–"6"（日曜=0 … 土曜=6）→ 事業所ID
+  defaultSchedule  String   @default("{}") @map("default_schedule")
+  /// 利用可能な事業所IDの配列JSON
+  allowedFacilityIds String @default("[]") @map("allowed_facility_ids")
+  monthlyLimit     Int      @map("monthly_limit")
+  /// 利用者の通し管理番号（CSV取込・出力の並び順に使用。重複は取込APIで拒否）
+  managementNumber Int?     @map("management_number")
+  role             UserRole @default(USER)
+  applications     Application[]
+
+  @@index([managementNumber])
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Facility {
+  id            String         @id @default(cuid())
+  name          String
+  applications  Application[]
+
+  @@map("facilities")
+}
+
+/// システム設定（例: 申請受付月）
+model SystemConfig {
+  key   String @id
+  value String
+
+  @@map("system_configs")
+}
+
+/// 申請1行。同一 groupId で1回の送信をまとめる。
+/// date が null の行は「申請全体」の連絡事項（facility は任意）。
+model Application {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  groupId      String    @map("group_id")
+  date         DateTime?
+  facilityId   String?   @map("facility_id")
+  transport    Boolean?
+  notes        String?
+  submittedAt  DateTime  @default(now()) @map("submitted_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facility  Facility? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+
+  @@index([userId, submittedAt])
+  @@index([groupId])
+  @@map("applications")
+}
+
+/// 管理者による申請内容の編集履歴（誰が・いつ・保存内容のスナップショット）
+model ApplicationAdminEditLog {
+  id            String   @id @default(cuid())
+  targetUserId  String   @map("target_user_id")
+  month         String
+  editorUserId  String   @map("editor_user_id")
+  editorName    String   @map("editor_name")
+  editorLoginId String   @map("editor_login_id")
+  editedAt      DateTime @default(now()) @map("edited_at")
+  snapshotJson  String   @map("snapshot_json")
+
+  @@index([targetUserId, month])
+  @@index([editedAt])
+  @@map("application_admin_edit_logs")
+}

@@ -1,0 +1,19 @@
+# 本番想定: Hetzner VPS 上で docker compose up -d
+# 事前に .env.production を用意し、NEXTAUTH_URL は https://あなたのドメイン に合わせること
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    environment:
+      # コンテナ内の SQLite パス（ホストの ./data に永続化）
+      DATABASE_URL: file:/app/data/prod.db
+    volumes:
+      - sqlite-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  sqlite-data:
