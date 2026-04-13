@@ -11,7 +11,7 @@ const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "ADMIN") {
-    return { session: null as const, error: NextResponse.json({ error: "forbidden" }, { status: 403 }) };
+    return { session: null, error: NextResponse.json({ error: "forbidden" }, { status: 403 }) };
   }
   return { session, error: null };
 }
