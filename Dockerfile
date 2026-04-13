@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 # postinstall で prisma generate が走るため、schema より先に prisma/ が必要
 COPY prisma ./prisma
-RUN npm ci
+RUN npm install
 
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
