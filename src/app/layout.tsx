@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "放課後等デイサービス 利用予定申請",
+  title: "オーパグループ 利用予定申請",
   description: "利用予定の申請フォーム",
 };
 

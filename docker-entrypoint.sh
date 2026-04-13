@@ -4,4 +4,4 @@ set -e
 mkdir -p /app/data
 chown -R nextjs:nodejs /app/data
 
-exec gosu nextjs sh -c "npx prisma db push && exec node server.js"
+exec gosu nextjs sh -c "npx prisma db push && npx prisma db seed && exec node server.js"

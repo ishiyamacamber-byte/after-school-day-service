@@ -32,7 +32,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-8">
       <h1 className="mb-2 text-center text-xl font-bold text-slate-800">
-        放課後等デイサービス
+        オーパグループ
       </h1>
       <p className="mb-8 text-center text-sm text-slate-600">利用予定申請（ログイン）</p>
       <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">

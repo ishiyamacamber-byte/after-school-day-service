@@ -4,6 +4,14 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0 && process.env.FORCE_SEED !== "1") {
+    console.log(
+      "Seed skipped: users already exist. Set FORCE_SEED=1 to re-run full seed."
+    );
+    return;
+  }
+
   const facilities = await Promise.all([
     prisma.facility.upsert({
       where: { id: "seed-fac-1" },
@@ -54,32 +62,40 @@ async function main() {
   const now = new Date();
   const openMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
+  const demoFields = {
+    name: "デモ利用者",
+    passwordHash,
+    defaultSchedule,
+    allowedFacilityIds: JSON.stringify(facilities.map((f) => f.id)),
+    monthlyLimit: 12,
+    managementNumber: 1,
+    role: "USER" as const,
+  };
+
   await prisma.user.upsert({
     where: { loginId: "demo" },
-    update: { managementNumber: 1 },
+    update: demoFields,
     create: {
-      name: "デモ利用者",
       loginId: "demo",
-      passwordHash,
-      defaultSchedule,
-      allowedFacilityIds: JSON.stringify(facilities.map((f) => f.id)),
-      monthlyLimit: 12,
-      managementNumber: 1,
-      role: "USER",
+      ...demoFields,
     },
   });
 
+  const adminFields = {
+    name: "デモ管理者",
+    passwordHash,
+    defaultSchedule: "{}",
+    allowedFacilityIds: JSON.stringify(facilities.map((f) => f.id)),
+    monthlyLimit: 31,
+    role: "ADMIN" as const,
+  };
+
   await prisma.user.upsert({
     where: { loginId: "admin" },
-    update: {},
+    update: adminFields,
     create: {
-      name: "デモ管理者",
       loginId: "admin",
-      passwordHash,
-      defaultSchedule: "{}",
-      allowedFacilityIds: JSON.stringify(facilities.map((f) => f.id)),
-      monthlyLimit: 31,
-      role: "ADMIN",
+      ...adminFields,
     },
   });
 
