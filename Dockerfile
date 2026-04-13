@@ -7,6 +7,14 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm install
 
+# ランタイム用: Prisma CLI が参照する effect / c12 などトップレベル依存を含む完全な production node_modules
+FROM node:22-bookworm-slim AS prod_deps
+WORKDIR /app
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci --omit=dev
+
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
@@ -27,10 +35,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps /app/node_modules/tsx ./node_modules/tsx
+COPY --from=prod_deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
