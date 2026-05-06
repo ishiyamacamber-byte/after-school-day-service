@@ -169,6 +169,10 @@ export async function GET(req: Request) {
   const lines = [header.map(csvCell).join(",")];
 
   for (const u of exportRows) {
+    // 欠番スロット等: 管理番号だけあり名前が空の行は出力しない
+    if (u.managementNumber != null && !u.name.trim()) {
+      continue;
+    }
     const agg =
       byUser.get(u.id) ??
       ({
