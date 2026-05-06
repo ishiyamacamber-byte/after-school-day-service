@@ -28,6 +28,13 @@ type Agg = {
   dailyNotes: string[];
 };
 
+type ExportRowUser = {
+  id: string;
+  name: string;
+  loginId: string;
+  managementNumber: number | null;
+};
+
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "ADMIN") {
@@ -97,8 +104,7 @@ export async function GET(req: Request) {
       (u) => u.name.toLowerCase().includes(ql) || u.loginId.toLowerCase().includes(ql)
     );
   }
-
-  list.sort((a, b) => {
+  const sorted = [...list].sort((a, b) => {
     if (a.managementNumber == null && b.managementNumber == null) {
       return a.loginId.localeCompare(b.loginId);
     }
@@ -107,6 +113,32 @@ export async function GET(req: Request) {
     if (a.managementNumber !== b.managementNumber) return a.managementNumber - b.managementNumber;
     return a.loginId.localeCompare(b.loginId);
   });
+
+  // 「詰めない」要件: management_no は 1..max の連番で出力し、欠番は空行を挿入する。
+  // userId / q で絞り込んだ場合は欠番補完を行わず、対象ユーザーのみを出力する。
+  const shouldKeepNumberSlots = !userId && !q;
+  const exportRows: ExportRowUser[] = shouldKeepNumberSlots
+    ? (() => {
+        const map = new Map<number, ExportRowUser>();
+        const noMgmt: ExportRowUser[] = [];
+        for (const u of sorted) {
+          if (u.managementNumber == null) {
+            noMgmt.push(u);
+            continue;
+          }
+          map.set(u.managementNumber, u);
+        }
+        const maxNo = Math.max(0, ...map.keys());
+        const rows: ExportRowUser[] = [];
+        for (let no = 1; no <= maxNo; no++) {
+          rows.push(
+            map.get(no) ?? { id: `slot-${no}`, name: "", loginId: "", managementNumber: no }
+          );
+        }
+        rows.push(...noMgmt);
+        return rows;
+      })()
+    : sorted;
 
   const header = [
     "管理番号",
@@ -119,7 +151,7 @@ export async function GET(req: Request) {
 
   const lines = [header.map(csvCell).join(",")];
 
-  for (const u of list) {
+  for (const u of exportRows) {
     const agg =
       byUser.get(u.id) ??
       ({

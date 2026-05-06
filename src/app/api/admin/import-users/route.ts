@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { parseCsv } from "@/lib/csv";
+import { decodeCsvUpload, parseCsv } from "@/lib/csv";
+import { isExcelUpload, parseExcelFirstSheetToRows } from "@/lib/excel-import";
 
 const weekdayColumns = [
   "default_sun",
@@ -25,7 +26,8 @@ function getCell(row: string[], map: HeaderMap, key: string): string {
 function toHeaderMap(header: string[]): HeaderMap {
   const map: HeaderMap = {};
   header.forEach((h, i) => {
-    map[h.trim().toLowerCase()] = i;
+    const key = h.replace(/^\uFEFF/, "").trim().toLowerCase();
+    if (key) map[key] = i;
   });
   return map;
 }
@@ -57,10 +59,19 @@ export async function POST(req: Request) {
     parseInt(String(rowOrderStartRaw ?? "1"), 10) || 1
   );
 
-  const text = await file.text();
-  const rows = parseCsv(text);
+  const buf = await file.arrayBuffer();
+  let rows: string[][];
+  if (isExcelUpload(file)) {
+    try {
+      rows = parseExcelFirstSheetToRows(buf);
+    } catch {
+      return NextResponse.json({ error: "invalid_spreadsheet" }, { status: 400 });
+    }
+  } else {
+    rows = parseCsv(decodeCsvUpload(buf));
+  }
   if (rows.length < 2) {
-    return NextResponse.json({ error: "empty_csv" }, { status: 400 });
+    return NextResponse.json({ error: "empty_file" }, { status: 400 });
   }
 
   const headerMap = toHeaderMap(rows[0]);

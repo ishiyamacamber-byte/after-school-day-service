@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
+    "sample:import-xlsx": "tsx scripts/generate-sample-import-xlsx.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -18,6 +19,7 @@
     "date-fns": "^4.1.0",
     "effect": "^3.21.0",
     "googleapis": "^148.0.0",
+    "iconv-lite": "^0.7.2",
     "next": "^15.2.4",
     "next-auth": "^4.24.11",
     "prisma": "^6.6.0",
@@ -25,6 +27,7 @@
     "react-day-picker": "^9.6.7",
     "react-dom": "^19.0.0",
     "tsx": "^4.19.3",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {

@@ -58,13 +58,14 @@ async function main() {
     "5": facilities[4].id,
   });
 
-  const passwordHash = await bcrypt.hash("password", 10);
+  const userPasswordHash = await bcrypt.hash("password", 10);
+  const adminPasswordHash = await bcrypt.hash("opa1224", 10);
   const now = new Date();
   const openMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   const demoFields = {
     name: "デモ利用者",
-    passwordHash,
+    passwordHash: userPasswordHash,
     defaultSchedule,
     allowedFacilityIds: JSON.stringify(facilities.map((f) => f.id)),
     monthlyLimit: 12,
@@ -83,7 +84,7 @@ async function main() {
 
   const adminFields = {
     name: "デモ管理者",
-    passwordHash,
+    passwordHash: adminPasswordHash,
     defaultSchedule: "{}",
     allowedFacilityIds: JSON.stringify(facilities.map((f) => f.id)),
     monthlyLimit: 31,

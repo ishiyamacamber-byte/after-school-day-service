@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { CreateUserForm } from "@/components/admin/create-user-form";
 
 export default async function AdminUsersPage() {
   const users = await prisma.user.findMany({
@@ -18,6 +19,7 @@ export default async function AdminUsersPage() {
           CSV取込
         </Link>
       </div>
+      <CreateUserForm />
       <ul className="flex flex-col gap-2">
         {users.map((u) => (
           <li key={u.id}>
