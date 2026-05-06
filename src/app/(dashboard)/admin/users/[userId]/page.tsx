@@ -24,6 +24,7 @@ export default async function AdminUserEditPage({ params }: { params: Promise<{ 
         id: user.id,
         name: user.name,
         loginId: user.loginId,
+        managementNumber: user.managementNumber,
         defaultSchedule: user.defaultSchedule,
         allowedFacilityIds: user.allowedFacilityIds,
         monthlyLimit: user.monthlyLimit,

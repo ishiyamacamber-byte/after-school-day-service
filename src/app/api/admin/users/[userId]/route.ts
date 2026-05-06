@@ -3,11 +3,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 const patchSchema = z.object({
   monthlyLimit: z.number().int().min(0).max(31).optional(),
   defaultSchedule: z.string().optional(),
   allowedFacilityIds: z.string().optional(),
+  loginId: z.string().trim().min(1).optional(),
+  password: z.string().min(4).optional(),
+  managementNumber: z.number().int().min(1).nullable().optional(),
 });
 
 export async function PATCH(
@@ -30,7 +34,18 @@ export async function PATCH(
     monthlyLimit?: number;
     defaultSchedule?: string;
     allowedFacilityIds?: string;
+    loginId?: string;
+    passwordHash?: string;
+    managementNumber?: number | null;
   } = {};
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  });
+  if (!target) {
+    return NextResponse.json({ error: "user_not_found" }, { status: 404 });
+  }
+
   if (parsed.data.monthlyLimit !== undefined) data.monthlyLimit = parsed.data.monthlyLimit;
   if (parsed.data.defaultSchedule !== undefined) {
     try {
@@ -58,10 +73,67 @@ export async function PATCH(
     }
     data.allowedFacilityIds = parsed.data.allowedFacilityIds;
   }
+  if (parsed.data.loginId !== undefined) {
+    const conflict = await prisma.user.findUnique({
+      where: { loginId: parsed.data.loginId },
+      select: { id: true },
+    });
+    if (conflict && conflict.id !== userId) {
+      return NextResponse.json({ error: "login_id_already_exists" }, { status: 409 });
+    }
+    data.loginId = parsed.data.loginId;
+  }
+  if (parsed.data.password !== undefined) {
+    data.passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  }
+  if (parsed.data.managementNumber !== undefined) {
+    if (parsed.data.managementNumber !== null) {
+      const conflict = await prisma.user.findFirst({
+        where: {
+          managementNumber: parsed.data.managementNumber,
+          id: { not: userId },
+        },
+        select: { id: true },
+      });
+      if (conflict) {
+        return NextResponse.json({ error: "management_number_already_exists" }, { status: 409 });
+      }
+    }
+    data.managementNumber = parsed.data.managementNumber;
+  }
 
   await prisma.user.update({
     where: { id: userId },
     data,
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "ADMIN") {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const { userId } = await params;
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, loginId: true },
+  });
+  if (!target) {
+    return NextResponse.json({ error: "user_not_found" }, { status: 404 });
+  }
+  if (target.role === "ADMIN") {
+    return NextResponse.json({ error: "cannot_delete_admin" }, { status: 400 });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.application.deleteMany({ where: { userId: target.id } });
+    await tx.user.delete({ where: { id: target.id } });
   });
 
   return NextResponse.json({ ok: true });

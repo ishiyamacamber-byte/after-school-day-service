@@ -22,7 +22,13 @@ function monthRange(month: string | undefined) {
 export default async function AdminApplicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; userId?: string; q?: string; sortFacility?: string }>;
+  searchParams: Promise<{
+    month?: string;
+    userId?: string;
+    q?: string;
+    sortFacility?: string;
+    unsubmittedFirst?: string;
+  }>;
 }) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "ADMIN") redirect("/apply");
@@ -32,6 +38,7 @@ export default async function AdminApplicationsPage({
   const userId = sp.userId ?? "";
   const q = (sp.q ?? "").trim();
   const sortFacility = (sp.sortFacility ?? "").trim();
+  const unsubmittedFirst = sp.unsubmittedFirst === "1";
 
   const [users, rows, openMonthConfig, facilities] = await Promise.all([
     prisma.user.findMany({
@@ -119,10 +126,31 @@ export default async function AdminApplicationsPage({
     byUser.set(key, current);
   }
 
-  let groupedRows = [...byUser.values()].map(({ submittedAt: _submittedAt, editableDayMap, ...rest }) => ({
-    ...rest,
-    editableDays: Object.values(editableDayMap).sort((a, b) => a.date.localeCompare(b.date)),
-  }));
+  let groupedRows = users.map((u) => {
+    const existing = byUser.get(u.id);
+    if (existing) {
+      const { submittedAt: _submittedAt, editableDayMap, ...rest } = existing;
+      return {
+        ...rest,
+        hasSubmission: true,
+        editableDays: Object.values(editableDayMap).sort((a, b) => a.date.localeCompare(b.date)),
+      };
+    }
+    return {
+      userId: u.id,
+      userName: u.name,
+      loginId: u.loginId,
+      submittedAtText: "未申請",
+      dayFacilities: {} as Record<number, string[]>,
+      overallNotes: [] as string[],
+      dailyNotes: [] as string[],
+      facilityCounts: {} as Record<string, number>,
+      facilityCountsList: [] as { name: string; days: number }[],
+      editableDays: [] as { date: string; facilityId: string; notes: string }[],
+      overallNotesText: "",
+      hasSubmission: false,
+    };
+  });
 
   if (q) {
     const ql = q.toLowerCase();
@@ -133,13 +161,21 @@ export default async function AdminApplicationsPage({
 
   if (sortFacility) {
     groupedRows = [...groupedRows].sort((a, b) => {
+      if (unsubmittedFirst && a.hasSubmission !== b.hasSubmission) {
+        return a.hasSubmission ? 1 : -1;
+      }
       const da = a.facilityCounts[sortFacility] ?? 0;
       const db = b.facilityCounts[sortFacility] ?? 0;
       if (db !== da) return db - da;
       return a.loginId.localeCompare(b.loginId);
     });
   } else {
-    groupedRows = [...groupedRows].sort((a, b) => a.loginId.localeCompare(b.loginId));
+    groupedRows = [...groupedRows].sort((a, b) => {
+      if (unsubmittedFirst && a.hasSubmission !== b.hasSubmission) {
+        return a.hasSubmission ? 1 : -1;
+      }
+      return a.loginId.localeCompare(b.loginId);
+    });
   }
 
   return (
@@ -148,6 +184,7 @@ export default async function AdminApplicationsPage({
       userId={userId}
       q={q}
       sortFacility={sortFacility}
+      unsubmittedFirst={unsubmittedFirst}
       openMonth={openMonthConfig?.value ?? month}
       users={users}
       facilities={facilities}

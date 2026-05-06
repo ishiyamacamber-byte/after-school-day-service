@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 type Row = {
   userId: string;
+  hasSubmission: boolean;
   submittedAtText: string;
   userName: string;
   loginId: string;
@@ -36,6 +37,7 @@ export function ApplicationsAdminClient({
   userId,
   q,
   sortFacility,
+  unsubmittedFirst,
   openMonth,
   rows,
   users,
@@ -45,6 +47,7 @@ export function ApplicationsAdminClient({
   userId: string;
   q: string;
   sortFacility: string;
+  unsubmittedFirst: boolean;
   openMonth: string;
   rows: Row[];
   users: User[];
@@ -471,6 +474,16 @@ export function ApplicationsAdminClient({
                 </option>
               ))}
             </select>
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              name="unsubmittedFirst"
+              value="1"
+              defaultChecked={unsubmittedFirst}
+              className="h-5 w-5 rounded border-slate-300"
+            />
+            未申請の人を先頭に表示
           </label>
         </div>
         <p className="mt-2 text-xs text-slate-500">

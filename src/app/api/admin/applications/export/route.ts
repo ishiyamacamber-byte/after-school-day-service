@@ -46,10 +46,10 @@ export async function GET(req: Request) {
   const q = (searchParams.get("q") ?? "").trim();
   const { month, start, end } = monthRange(searchParams.get("month"));
 
-  const [appRows, users] = await Promise.all([
+  const [datedRows, users] = await Promise.all([
     prisma.application.findMany({
       where: {
-        submittedAt: { gte: start, lt: end },
+        date: { gte: start, lt: end },
         ...(userId ? { userId } : {}),
       },
       orderBy: [{ submittedAt: "desc" }, { date: "asc" }],
@@ -73,6 +73,23 @@ export async function GET(req: Request) {
   ]);
 
   const byUser = new Map<string, Agg>();
+
+  const targetGroupIds = [...new Set(datedRows.map((r) => r.groupId))];
+  const overallRows =
+    targetGroupIds.length > 0
+      ? await prisma.application.findMany({
+          where: {
+            groupId: { in: targetGroupIds },
+            date: null,
+          },
+          orderBy: [{ submittedAt: "desc" }],
+          include: {
+            user: { select: { name: true, loginId: true } },
+            facility: { select: { name: true } },
+          },
+        })
+      : [];
+  const appRows = [...datedRows, ...overallRows];
 
   for (const r of appRows) {
     const cur = byUser.get(r.userId) ?? {
