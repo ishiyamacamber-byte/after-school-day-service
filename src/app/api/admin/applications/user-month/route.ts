@@ -5,7 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { insertAdminEditLogRaw } from "@/lib/application-admin-edit-log";
 import { appendApplicationRows } from "@/lib/google-sheets";
 import { prisma } from "@/lib/prisma";
-import { isDateInMonthKey, monthEndExclusive, monthStart } from "@/lib/month";
+import { deleteApplicationsForCalendarMonth } from "@/lib/application-calendar-month";
+import { isDateInMonthKey } from "@/lib/month";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -38,14 +39,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const start = monthStart(parsed.data.month);
-  const end = monthEndExclusive(parsed.data.month);
-
-  const result = await prisma.application.deleteMany({
-    where: {
-      userId: parsed.data.userId,
-      submittedAt: { gte: start, lt: end },
-    },
+  const result = await deleteApplicationsForCalendarMonth(prisma, parsed.data.month, {
+    userId: parsed.data.userId,
   });
 
   return NextResponse.json({ ok: true, deleted: result.count });
@@ -89,8 +84,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "facility_not_found" }, { status: 400 });
   }
 
-  const start = monthStart(month);
-  const end = monthEndExclusive(month);
   const groupId = crypto.randomUUID();
   const submittedAt = new Date();
   const hasOverall = !!overallNotes?.trim();
@@ -115,9 +108,7 @@ export async function PATCH(req: Request) {
   };
 
   await prisma.$transaction(async (tx) => {
-    await tx.application.deleteMany({
-      where: { userId, submittedAt: { gte: start, lt: end } },
-    });
+    await deleteApplicationsForCalendarMonth(tx, month, { userId });
     if (hasOverall) {
       await tx.application.create({
         data: {
@@ -177,13 +168,14 @@ export async function PATCH(req: Request) {
       notes: d.notes?.trim() ?? "",
     });
   }
+  let sheetsWarning: string | undefined;
   try {
     await appendApplicationRows(rows);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "sheets_append_failed" }, { status: 502 });
+    sheetsWarning = "spreadsheet_sync_failed";
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(sheetsWarning && { warning: sheetsWarning }) });
 }
 

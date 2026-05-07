@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   const already = await prisma.application.findFirst({
     where: {
       userId: session.user.id,
-      submittedAt: { gte: start, lt: end },
+      date: { gte: start, lt: end },
     },
     select: { id: true },
   });

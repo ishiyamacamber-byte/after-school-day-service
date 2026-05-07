@@ -2,8 +2,8 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { deleteApplicationsForCalendarMonth, whereApplicationsForCalendarMonth } from "@/lib/application-calendar-month";
 import { prisma } from "@/lib/prisma";
-import { monthEndExclusive, monthStart } from "@/lib/month";
 import { Prisma } from "@prisma/client";
 
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
@@ -26,10 +26,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid_query" }, { status: 400 });
   }
   const month = parsed.data;
-  const start = monthStart(month);
-  const end = monthEndExclusive(month);
 
-  const whereApp = { submittedAt: { gte: start, lt: end } as const };
+  const whereApp = await whereApplicationsForCalendarMonth(prisma, month);
 
   const [applicationRowCount, byUser, logAgg] = await Promise.all([
     prisma.application.count({ where: whereApp }),
@@ -63,13 +61,9 @@ export async function POST(req: Request) {
   }
 
   const { month } = parsed.data;
-  const start = monthStart(month);
-  const end = monthEndExclusive(month);
 
   const deletedApplications = await prisma.$transaction(async (tx) => {
-    const r = await tx.application.deleteMany({
-      where: { submittedAt: { gte: start, lt: end } },
-    });
+    const r = await deleteApplicationsForCalendarMonth(tx, month);
     await tx.$executeRaw(Prisma.sql`
       DELETE FROM "application_admin_edit_logs" WHERE "month" = ${month}
     `);

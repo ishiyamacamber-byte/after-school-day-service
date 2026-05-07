@@ -33,6 +33,8 @@ type UserPayload = {
   alreadySubmitted: boolean;
   submittedAtText: string | null;
   submissionSummary: SubmissionSummary | null;
+  summariesByMonth: Record<string, SubmissionSummary>;
+  submittedMonths: string[];
   adminEditHistory: UserAdminEditHistoryItem[];
 };
 
@@ -58,12 +60,19 @@ export function ApplyPageClient({
   const openMonthStart = new Date(oy, om - 1, 1);
   const openMonthEnd = new Date(oy, om, 0);
   const [submittedAtText, setSubmittedAtText] = useState<string | null>(user.submittedAtText);
-  const hasSubmitted = submittedAtText !== null || user.alreadySubmitted;
-  const displaySummary = user.submissionSummary;
+  const [submittedNow, setSubmittedNow] = useState(user.alreadySubmitted);
+  const [viewMonth, setViewMonth] = useState(
+    user.submittedMonths.includes(user.openMonth)
+      ? user.openMonth
+      : user.submittedMonths[user.submittedMonths.length - 1] ?? user.openMonth
+  );
+  const hasSubmitted = submittedNow;
+  const displaySummary = user.summariesByMonth[viewMonth] ?? null;
 
   useEffect(() => {
     setSubmittedAtText(user.submittedAtText);
-  }, [user.submittedAtText]);
+    setSubmittedNow(user.alreadySubmitted);
+  }, [user.submittedAtText, user.alreadySubmitted]);
 
   const hasFacilities = facilities.length > 0;
   const [month] = useState(() => openMonthDate);
@@ -160,6 +169,7 @@ export function ApplyPageClient({
     }
     setMessage("申請を受け付けました。");
     setSubmittedAtText(format(new Date(), "yyyy-MM-dd HH:mm"));
+    setSubmittedNow(true);
     setSelected([]);
     setByDate({});
     router.refresh();
@@ -188,6 +198,24 @@ export function ApplyPageClient({
 
           {displaySummary && (
             <>
+              {user.submittedMonths.length > 1 && (
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <label className="text-sm font-medium text-slate-700">
+                    表示月
+                    <select
+                      value={viewMonth}
+                      onChange={(e) => setViewMonth(e.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
+                    >
+                      {user.submittedMonths.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
               <div>
                 <h2 className="text-lg font-bold text-slate-900">いま登録されている利用予定</h2>
                 <p className="mt-1 text-xs text-slate-600">
@@ -195,8 +223,8 @@ export function ApplyPageClient({
                 </p>
               </div>
               <SubmittedCalendar
-                year={oy}
-                monthIndex={om - 1}
+                year={Number(viewMonth.split("-")[0])}
+                monthIndex={Number(viewMonth.split("-")[1]) - 1}
                 dayMap={Object.fromEntries(
                   Object.entries(displaySummary.days).map(([k, v]) => [
                     k,

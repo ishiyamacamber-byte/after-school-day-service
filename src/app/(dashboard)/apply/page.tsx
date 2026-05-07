@@ -73,42 +73,63 @@ export default async function ApplyPage() {
   if (!user) redirect("/login");
 
   const openMonth = openMonthConfig?.value ?? toMonthKey(new Date());
-  const [start, end] = [monthStart(openMonth), monthEndExclusive(openMonth)];
-  const latestSubmission = await prisma.application.findFirst({
-    where: { userId: user.id, submittedAt: { gte: start, lt: end } },
-    orderBy: { submittedAt: "desc" },
-    select: { submittedAt: true },
+  const dayApps = await prisma.application.findMany({
+    where: { userId: user.id, date: { not: null } },
+    orderBy: [{ date: "asc" }],
+    include: { facility: { select: { name: true } } },
   });
 
-  let submissionSummary: {
-    days: Record<string, { facilityName: string; notes: string | null }>;
-    overallNotes: string | null;
-  } | null = null;
+  const monthsSet = new Set<string>();
+  const groupIds = new Set<string>();
+  const summariesByMonth: Record<
+    string,
+    { days: Record<string, { facilityName: string; notes: string | null }>; overallNotes: string | null }
+  > = {};
 
-  if (latestSubmission) {
-    const apps = await prisma.application.findMany({
-      where: { userId: user.id, submittedAt: { gte: start, lt: end } },
-      orderBy: [{ date: "asc" }],
-      include: { facility: { select: { name: true } } },
-    });
-    const days: Record<string, { facilityName: string; notes: string | null }> = {};
-    const overallParts: string[] = [];
-    for (const a of apps) {
-      if (!a.date) {
-        if (a.notes?.trim()) overallParts.push(a.notes.trim());
-        continue;
-      }
-      const key = format(a.date, "yyyy-MM-dd");
-      days[key] = {
-        facilityName: a.facility?.name ?? "",
-        notes: a.notes?.trim() ?? null,
-      };
-    }
-    submissionSummary = {
-      days,
-      overallNotes: overallParts.length > 0 ? overallParts.join(" / ") : null,
+  for (const a of dayApps) {
+    if (!a.date) continue;
+    const mk = toMonthKey(a.date);
+    monthsSet.add(mk);
+    groupIds.add(a.groupId);
+    const key = format(a.date, "yyyy-MM-dd");
+    const s =
+      summariesByMonth[mk] ??
+      ({
+        days: {},
+        overallNotes: null,
+      } as {
+        days: Record<string, { facilityName: string; notes: string | null }>;
+        overallNotes: string | null;
+      });
+    s.days[key] = {
+      facilityName: a.facility?.name ?? "",
+      notes: a.notes?.trim() ?? null,
     };
+    summariesByMonth[mk] = s;
   }
+
+  const overallApps =
+    groupIds.size > 0
+      ? await prisma.application.findMany({
+          where: { userId: user.id, groupId: { in: [...groupIds] }, date: null },
+          orderBy: [{ submittedAt: "desc" }],
+        })
+      : [];
+  for (const a of overallApps) {
+    const anyDay = dayApps.find((d) => d.groupId === a.groupId && d.date);
+    if (!anyDay?.date) continue;
+    const mk = toMonthKey(anyDay.date);
+    if (!summariesByMonth[mk]) continue;
+    const nowOverall = summariesByMonth[mk]!.overallNotes;
+    const note = a.notes?.trim();
+    if (!note) continue;
+    summariesByMonth[mk]!.overallNotes = nowOverall ? `${nowOverall} / ${note}` : note;
+  }
+
+  const submittedMonths = [...monthsSet].sort();
+  const hasOpenMonthSubmission = submittedMonths.includes(openMonth);
+  const openMonthSummary = summariesByMonth[openMonth] ?? null;
+  const latestSubmittedAt = dayApps.length > 0 ? dayApps[dayApps.length - 1]!.submittedAt : null;
 
   const facilityNameById = new Map(
     (await prisma.facility.findMany({ select: { id: true, name: true } })).map((f) => [f.id, f.name])
@@ -134,11 +155,11 @@ export default async function ApplyPage() {
         defaultSchedule: user.defaultSchedule,
         monthlyLimit: user.monthlyLimit,
         openMonth,
-        alreadySubmitted: !!latestSubmission,
-        submittedAtText: latestSubmission
-          ? format(latestSubmission.submittedAt, "yyyy-MM-dd HH:mm")
-          : null,
-        submissionSummary,
+        alreadySubmitted: hasOpenMonthSubmission,
+        submittedAtText: latestSubmittedAt ? format(latestSubmittedAt, "yyyy-MM-dd HH:mm") : null,
+        submissionSummary: openMonthSummary,
+        summariesByMonth,
+        submittedMonths,
         adminEditHistory,
       }}
       facilities={filteredFacilities}

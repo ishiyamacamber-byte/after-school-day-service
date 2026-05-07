@@ -111,6 +111,7 @@ export function ApplicationsAdminClient({
         setEditTarget(null);
         setEditStep("form");
         setEditDays([]);
+        setSelectedEditDate("");
         setEditOverallNotes("");
       }
     }
@@ -188,19 +189,17 @@ export function ApplicationsAdminClient({
     });
   }
 
-  function toggleEditDay(day: number) {
+  function onEditCalendarDayClick(day: number) {
     const date = `${month}-${String(day).padStart(2, "0")}`;
+    upsertEditDay(date, {});
+    setSelectedEditDate(date);
+  }
+
+  function removeEditDay(date: string) {
     setEditDays((prev) => {
-      const exists = prev.some((d) => d.date === date);
-      if (exists) {
-        const next = prev.filter((d) => d.date !== date);
-        if (selectedEditDate === date) {
-          setSelectedEditDate(next[0]?.date ?? "");
-        }
-        return next;
-      }
-      setSelectedEditDate(date);
-      return [...prev, { date, facilityId: facilities[0]?.id ?? "", notes: "" }];
+      const next = prev.filter((d) => d.date !== date);
+      setSelectedEditDate((sel) => (sel === date ? next[0]?.date ?? "" : sel));
+      return next;
     });
   }
 
@@ -338,7 +337,14 @@ export function ApplicationsAdminClient({
       setMessage("更新に失敗しました。");
       return;
     }
-    setMessage("申請内容を更新しました。");
+    const j = (await res.json().catch(() => ({}))) as { warning?: string };
+    if (j.warning === "spreadsheet_sync_failed") {
+      setMessage(
+        "申請内容を更新しました（スプレッドシートへの追記のみ失敗しました。サーバーログを確認してください）。"
+      );
+    } else {
+      setMessage("申請内容を更新しました。");
+    }
     cancelEdit();
     router.refresh();
   }
@@ -391,7 +397,8 @@ export function ApplicationsAdminClient({
         <p className="text-sm font-semibold text-amber-950">過去月など・指定月の一括削除</p>
         <p className="mt-1 text-xs leading-relaxed text-amber-950/90">
           受付が終わった月のデータをまとめて削除できます（例: 受付を5月にしたあと、4月分を一括削除）。
-          選択した月について、<strong>全利用者</strong>の申請行を削除し、同じ月キーの管理者編集履歴も削除します。取り消しはできません。
+          削除対象は<strong>利用日が選択した月に含まれる申請</strong>です（一覧・CSV の「表示している月」と同じ基準。いつのタイミングで提出されたかではありません）。
+          <strong>全利用者</strong>分を削除し、同じ月キーの管理者編集履歴も削除します。取り消しはできません。
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <label className="text-xs font-medium text-amber-950">
@@ -672,7 +679,7 @@ export function ApplicationsAdminClient({
                     />
                   </label>
                   <p className="mt-3 text-xs text-slate-600">
-                    カレンダーの日付をクリックすると選択/解除できます。選択した日付を下で1日ずつ編集します。
+                    カレンダーの日付をクリックするとその日を選択します（まだない日は追加されます）。各セルには事業所名を表示します。削除は下の「この日を削除」から行ってください。
                   </p>
                   <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div className="grid grid-cols-7 gap-1">
@@ -698,29 +705,30 @@ export function ApplicationsAdminClient({
                       {Array.from({ length: daysInMonth }, (_, i) => {
                         const day = i + 1;
                         const date = `${month}-${String(day).padStart(2, "0")}`;
-                        const isSelected = editDays.some((d) => d.date === date);
+                        const editDayForCell = editDays.find((d) => d.date === date);
                         const isActive = selectedEditDate === date;
+                        const facilityLabel = editDayForCell ? facilityName(editDayForCell.facilityId) : "";
                         return (
                           <button
                             key={`edit-day-${day}`}
                             type="button"
-                            onClick={() => {
-                              if (isSelected && !isActive) {
-                                setSelectedEditDate(date);
-                                return;
-                              }
-                              toggleEditDay(day);
-                            }}
+                            onClick={() => onEditCalendarDayClick(day)}
                             className={`min-h-[3.25rem] rounded-md border p-1 text-left ${
                               isActive
                                 ? "border-blue-600 bg-blue-100"
-                                : isSelected
+                                : editDayForCell
                                   ? "border-blue-300 bg-blue-50"
                                   : "border-slate-200 bg-white"
                             }`}
                           >
-                            <div className={`text-xs font-bold ${isSelected ? "text-slate-900" : "text-slate-400"}`}>{day}</div>
-                            <div className="mt-0.5 text-[10px] text-slate-600">{isSelected ? "選択中" : "—"}</div>
+                            <div
+                              className={`text-xs font-bold ${editDayForCell ? "text-slate-900" : "text-slate-400"}`}
+                            >
+                              {day}
+                            </div>
+                            <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-slate-700">
+                              {editDayForCell ? facilityLabel.trim() || "（未選択）" : "—"}
+                            </div>
                           </button>
                         );
                       })}
@@ -751,6 +759,14 @@ export function ApplicationsAdminClient({
                           className="min-h-16 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                         />
                       </label>
+                      <button
+                        type="button"
+                        onClick={() => removeEditDay(selectedEditDay.date)}
+                        disabled={savingEdit}
+                        className="mt-3 min-h-10 w-full rounded-lg border border-red-300 bg-red-50 px-3 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-60"
+                      >
+                        この日を削除
+                      </button>
                     </div>
                   ) : (
                     <p className="mt-3 text-xs text-slate-600">編集する日付をカレンダーから選択してください。</p>
