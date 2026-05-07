@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
 type Row = {
   userId: string;
   hasSubmission: boolean;
@@ -54,12 +56,16 @@ export function ApplicationsAdminClient({
   facilities: FacilityOpt[];
 }) {
   const router = useRouter();
+  const [year, monthIndex] = month.split("-").map(Number);
+  const firstDow = new Date(year, monthIndex - 1, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex, 0).getDate();
   const [selectedOpenMonth, setSelectedOpenMonth] = useState(openMonth);
   const [busyMonth, setBusyMonth] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<Row | null>(null);
   const [editStep, setEditStep] = useState<EditStep>("form");
   const [editDays, setEditDays] = useState<EditDay[]>([]);
+  const [selectedEditDate, setSelectedEditDate] = useState<string>("");
   const [editOverallNotes, setEditOverallNotes] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [message, setMessage] = useState("");
@@ -156,30 +162,46 @@ export function ApplicationsAdminClient({
     setEditTarget(row);
     setEditStep("form");
     setEditOverallNotes(row.overallNotesText ?? "");
-    setEditDays(
+    const initial =
       row.editableDays.length > 0
         ? row.editableDays.map((d) => ({ ...d }))
-        : [{ date: `${month}-01`, facilityId: facilities[0]?.id ?? "", notes: "" }]
-    );
+        : [{ date: `${month}-01`, facilityId: facilities[0]?.id ?? "", notes: "" }];
+    setEditDays(initial);
+    setSelectedEditDate(initial[0]?.date ?? `${month}-01`);
   }
 
   function cancelEdit() {
     setEditTarget(null);
     setEditStep("form");
     setEditDays([]);
+    setSelectedEditDate("");
     setEditOverallNotes("");
   }
 
-  function patchEditDay(index: number, patch: Partial<EditDay>) {
-    setEditDays((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+  function upsertEditDay(date: string, patch: Partial<EditDay>) {
+    setEditDays((prev) => {
+      const idx = prev.findIndex((d) => d.date === date);
+      if (idx >= 0) {
+        return prev.map((d, i) => (i === idx ? { ...d, ...patch } : d));
+      }
+      return [...prev, { date, facilityId: facilities[0]?.id ?? "", notes: "", ...patch }];
+    });
   }
 
-  function addEditDay() {
-    setEditDays((prev) => [...prev, { date: `${month}-01`, facilityId: facilities[0]?.id ?? "", notes: "" }]);
-  }
-
-  function removeEditDay(index: number) {
-    setEditDays((prev) => prev.filter((_, i) => i !== index));
+  function toggleEditDay(day: number) {
+    const date = `${month}-${String(day).padStart(2, "0")}`;
+    setEditDays((prev) => {
+      const exists = prev.some((d) => d.date === date);
+      if (exists) {
+        const next = prev.filter((d) => d.date !== date);
+        if (selectedEditDate === date) {
+          setSelectedEditDate(next[0]?.date ?? "");
+        }
+        return next;
+      }
+      setSelectedEditDate(date);
+      return [...prev, { date, facilityId: facilities[0]?.id ?? "", notes: "" }];
+    });
   }
 
   function validateEdit(): string | null {
@@ -322,14 +344,13 @@ export function ApplicationsAdminClient({
   }
 
   const sortedPreviewDays = [...editDays].sort((a, b) => a.date.localeCompare(b.date));
+  const selectedEditDay = editDays.find((d) => d.date === selectedEditDate) ?? null;
 
   const csvHref =
     `/api/admin/applications/export?month=${encodeURIComponent(month)}` +
     (userId ? `&userId=${encodeURIComponent(userId)}` : "") +
     (q ? `&q=${encodeURIComponent(q)}` : "") +
     (sortFacility ? `&sortFacility=${encodeURIComponent(sortFacility)}` : "");
-
-  const dayCols = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
     <div className="flex flex-col gap-4">
@@ -555,11 +576,46 @@ export function ApplicationsAdminClient({
                   ))
                 : "—"}
             </div>
-            <div className="mt-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-800">
-              {dayCols
-                .filter((d) => (r.dayFacilities[d] ?? []).length > 0)
-                .map((d) => `${d}日: ${r.dayFacilities[d].join(" / ")}`)
-                .join(" | ") || "日付申請なし"}
+            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="grid grid-cols-7 gap-1">
+                {WEEKDAYS.map((w, idx) => (
+                  <div
+                    key={w}
+                    className={`rounded-md py-1 text-center text-[10px] font-bold ${
+                      idx === 0
+                        ? "bg-red-50 text-red-700"
+                        : idx === 6
+                          ? "bg-blue-50 text-blue-700"
+                          : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {w}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 grid grid-cols-7 gap-1">
+                {Array.from({ length: firstDow }, (_, i) => (
+                  <div key={`pad-${r.userId}-${i}`} className="min-h-[3.75rem] rounded-md bg-transparent" />
+                ))}
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const day = i + 1;
+                  const names = r.dayFacilities[day] ?? [];
+                  const has = names.length > 0;
+                  return (
+                    <div
+                      key={`${r.userId}-d-${day}`}
+                      className={`min-h-[3.75rem] rounded-md border p-1 ${
+                        has ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white"
+                      }`}
+                    >
+                      <div className={`text-xs font-bold ${has ? "text-slate-900" : "text-slate-400"}`}>{day}</div>
+                      <div className={`mt-0.5 line-clamp-3 text-[10px] leading-tight ${has ? "text-blue-900" : "text-slate-400"}`}>
+                        {has ? names.join(" / ") : "—"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="mt-2 whitespace-pre-wrap text-xs text-slate-700">
               全体連絡事項: {r.overallNotes.join(" / ") || "なし"}
@@ -615,62 +671,90 @@ export function ApplicationsAdminClient({
                       className="min-h-24 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
                     />
                   </label>
-                  <div className="mt-3 space-y-2">
-                    {editDays.map((d, idx) => (
-                      <div key={`${d.date}-${idx}`} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          <label className="text-xs font-medium text-slate-700">
-                            日付
-                            <input
-                              type="date"
-                              value={d.date}
-                              onChange={(e) => patchEditDay(idx, { date: e.target.value })}
-                              className="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-2 text-sm"
-                            />
-                          </label>
-                          <label className="text-xs font-medium text-slate-700">
-                            事業所
-                            <select
-                              value={d.facilityId}
-                              onChange={(e) => patchEditDay(idx, { facilityId: e.target.value })}
-                              className="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-2 text-sm"
-                            >
-                              {facilities.map((f) => (
-                                <option key={f.id} value={f.id}>
-                                  {f.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <div className="flex items-end">
-                            <button
-                              type="button"
-                              onClick={() => removeEditDay(idx)}
-                              disabled={editDays.length <= 1}
-                              className="min-h-10 rounded-md border border-rose-300 bg-rose-50 px-3 text-xs font-semibold text-rose-800 disabled:opacity-50"
-                            >
-                              行を削除
-                            </button>
-                          </div>
+                  <p className="mt-3 text-xs text-slate-600">
+                    カレンダーの日付をクリックすると選択/解除できます。選択した日付を下で1日ずつ編集します。
+                  </p>
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid grid-cols-7 gap-1">
+                      {WEEKDAYS.map((w, idx) => (
+                        <div
+                          key={`edit-w-${w}`}
+                          className={`rounded-md py-1 text-center text-[10px] font-bold ${
+                            idx === 0
+                              ? "bg-red-50 text-red-700"
+                              : idx === 6
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {w}
                         </div>
-                        <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-slate-700">
-                          日別連絡事項
-                          <textarea
-                            value={d.notes}
-                            onChange={(e) => patchEditDay(idx, { notes: e.target.value })}
-                            className="min-h-16 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-                          />
-                        </label>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <div className="mt-1 grid grid-cols-7 gap-1">
+                      {Array.from({ length: firstDow }, (_, i) => (
+                        <div key={`edit-pad-${i}`} className="min-h-[3.25rem] rounded-md bg-transparent" />
+                      ))}
+                      {Array.from({ length: daysInMonth }, (_, i) => {
+                        const day = i + 1;
+                        const date = `${month}-${String(day).padStart(2, "0")}`;
+                        const isSelected = editDays.some((d) => d.date === date);
+                        const isActive = selectedEditDate === date;
+                        return (
+                          <button
+                            key={`edit-day-${day}`}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected && !isActive) {
+                                setSelectedEditDate(date);
+                                return;
+                              }
+                              toggleEditDay(day);
+                            }}
+                            className={`min-h-[3.25rem] rounded-md border p-1 text-left ${
+                              isActive
+                                ? "border-blue-600 bg-blue-100"
+                                : isSelected
+                                  ? "border-blue-300 bg-blue-50"
+                                  : "border-slate-200 bg-white"
+                            }`}
+                          >
+                            <div className={`text-xs font-bold ${isSelected ? "text-slate-900" : "text-slate-400"}`}>{day}</div>
+                            <div className="mt-0.5 text-[10px] text-slate-600">{isSelected ? "選択中" : "—"}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={addEditDay}
-                    className="mt-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800"
-                  >
-                    日付行を追加
-                  </button>
+                  {selectedEditDay ? (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="text-sm font-semibold text-slate-900">{selectedEditDay.date}</p>
+                      <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-slate-700">
+                        事業所
+                        <select
+                          value={selectedEditDay.facilityId}
+                          onChange={(e) => upsertEditDay(selectedEditDay.date, { facilityId: e.target.value })}
+                          className="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-2 text-sm"
+                        >
+                          {facilities.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-slate-700">
+                        日別連絡事項
+                        <textarea
+                          value={selectedEditDay.notes}
+                          onChange={(e) => upsertEditDay(selectedEditDay.date, { notes: e.target.value })}
+                          className="min-h-16 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-slate-600">編集する日付をカレンダーから選択してください。</p>
+                  )}
                 </>
               ) : (
                 <div className="space-y-3 text-sm text-slate-800">

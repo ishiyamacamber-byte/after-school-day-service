@@ -40,7 +40,7 @@ export default async function AdminApplicationsPage({
   const sortFacility = (sp.sortFacility ?? "").trim();
   const unsubmittedFirst = sp.unsubmittedFirst === "1";
 
-  const [users, rows, openMonthConfig, facilities] = await Promise.all([
+  const [users, datedRows, openMonthConfig, facilities] = await Promise.all([
     prisma.user.findMany({
       where: { role: "USER" },
       orderBy: { loginId: "asc" },
@@ -48,7 +48,7 @@ export default async function AdminApplicationsPage({
     }),
     prisma.application.findMany({
       where: {
-        submittedAt: { gte: start, lt: end },
+        date: { gte: start, lt: end },
         ...(userId ? { userId } : {}),
       },
       orderBy: [{ submittedAt: "desc" }, { date: "asc" }],
@@ -60,6 +60,24 @@ export default async function AdminApplicationsPage({
     prisma.systemConfig.findUnique({ where: { key: "open_month" } }),
     prisma.facility.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
+
+  const targetGroupIds = [...new Set(datedRows.map((r) => r.groupId))];
+  const overallRows =
+    targetGroupIds.length > 0
+      ? await prisma.application.findMany({
+          where: {
+            groupId: { in: targetGroupIds },
+            date: null,
+            ...(userId ? { userId } : {}),
+          },
+          orderBy: [{ submittedAt: "desc" }],
+          include: {
+            user: { select: { name: true, loginId: true } },
+            facility: { select: { name: true } },
+          },
+        })
+      : [];
+  const rows = [...datedRows, ...overallRows];
 
   const byUser = new Map<
     string,
