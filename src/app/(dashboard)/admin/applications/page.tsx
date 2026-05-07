@@ -6,6 +6,23 @@ import { prisma } from "@/lib/prisma";
 import { ApplicationsAdminClient } from "@/components/admin/applications-admin-client";
 import { countDaysByFacility, facilityCountsList } from "@/lib/admin-application-list";
 
+function parseAllowedIds(raw: string | null | undefined): string[] {
+  try {
+    const list = JSON.parse(raw ?? "[]") as unknown;
+    if (!Array.isArray(list)) return [];
+    return list.filter((v): v is string => typeof v === "string");
+  } catch {
+    return [];
+  }
+}
+
+/** allowedFacilityIds が空なら制限なし（どの事業所も利用可能）と submit ルートと揃える */
+function userMayUseFacility(allowedFacilityIdsRaw: string | null | undefined, facilityId: string): boolean {
+  const ids = parseAllowedIds(allowedFacilityIdsRaw);
+  if (ids.length === 0) return true;
+  return ids.includes(facilityId);
+}
+
 function monthRange(month: string | undefined) {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
     const now = new Date();
@@ -27,6 +44,8 @@ export default async function AdminApplicationsPage({
     userId?: string;
     q?: string;
     sortFacility?: string;
+    /** submitted=申請日時順（早い申請が上） / management=管理番号順 */
+    listSort?: string;
     unsubmittedFirst?: string;
   }>;
 }) {
@@ -37,14 +56,23 @@ export default async function AdminApplicationsPage({
   const { month, start, end } = monthRange(sp.month);
   const userId = sp.userId ?? "";
   const q = (sp.q ?? "").trim();
+  /** 事業所 ID（利用者設定の allowedFacilityIds と突き合わせる） */
   const sortFacility = (sp.sortFacility ?? "").trim();
+  const listSort = sp.listSort === "management" ? "management" : "submitted";
   const unsubmittedFirst = sp.unsubmittedFirst === "1";
 
   const [users, datedRows, openMonthConfig, facilities] = await Promise.all([
     prisma.user.findMany({
       where: { role: "USER" },
       orderBy: { loginId: "asc" },
-      select: { id: true, name: true, loginId: true },
+      select: {
+        id: true,
+        name: true,
+        loginId: true,
+        allowedFacilityIds: true,
+        managementNumber: true,
+        monthlyLimit: true,
+      },
     }),
     prisma.application.findMany({
       where: {
@@ -147,10 +175,14 @@ export default async function AdminApplicationsPage({
   let groupedRows = users.map((u) => {
     const existing = byUser.get(u.id);
     if (existing) {
-      const { submittedAt: _submittedAt, editableDayMap, ...rest } = existing;
+      const { editableDayMap, ...rest } = existing;
+      const appliedDaysCount = Object.keys(editableDayMap).length;
       return {
         ...rest,
-        hasSubmission: true,
+        hasSubmission: true as const,
+        managementNumber: u.managementNumber,
+        monthlyLimit: u.monthlyLimit,
+        appliedDaysCount,
         editableDays: Object.values(editableDayMap).sort((a, b) => a.date.localeCompare(b.date)),
       };
     }
@@ -159,6 +191,7 @@ export default async function AdminApplicationsPage({
       userName: u.name,
       loginId: u.loginId,
       submittedAtText: "未申請",
+      submittedAt: null as Date | null,
       dayFacilities: {} as Record<number, string[]>,
       overallNotes: [] as string[],
       dailyNotes: [] as string[],
@@ -166,7 +199,10 @@ export default async function AdminApplicationsPage({
       facilityCountsList: [] as { name: string; days: number }[],
       editableDays: [] as { date: string; facilityId: string; notes: string }[],
       overallNotesText: "",
-      hasSubmission: false,
+      hasSubmission: false as const,
+      managementNumber: u.managementNumber,
+      monthlyLimit: u.monthlyLimit,
+      appliedDaysCount: 0,
     };
   });
 
@@ -177,24 +213,45 @@ export default async function AdminApplicationsPage({
     );
   }
 
-  if (sortFacility) {
-    groupedRows = [...groupedRows].sort((a, b) => {
-      if (unsubmittedFirst && a.hasSubmission !== b.hasSubmission) {
-        return a.hasSubmission ? 1 : -1;
-      }
-      const da = a.facilityCounts[sortFacility] ?? 0;
-      const db = b.facilityCounts[sortFacility] ?? 0;
-      if (db !== da) return db - da;
-      return a.loginId.localeCompare(b.loginId);
-    });
-  } else {
-    groupedRows = [...groupedRows].sort((a, b) => {
-      if (unsubmittedFirst && a.hasSubmission !== b.hasSubmission) {
-        return a.hasSubmission ? 1 : -1;
-      }
-      return a.loginId.localeCompare(b.loginId);
-    });
+  function cmpManagementNumber(a: number | null, b: number | null): number {
+    if (a === null && b === null) return 0;
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
   }
+
+  const allowedFirst = sortFacility.length
+    ? new Map(users.map((u) => [u.id, userMayUseFacility(u.allowedFacilityIds, sortFacility)]))
+    : null;
+
+  groupedRows = [...groupedRows].sort((a, b) => {
+    if (unsubmittedFirst && a.hasSubmission !== b.hasSubmission) {
+      return a.hasSubmission ? 1 : -1;
+    }
+    if (allowedFirst) {
+      const aOk = allowedFirst.get(a.userId) ?? false;
+      const bOk = allowedFirst.get(b.userId) ?? false;
+      if (aOk !== bOk) return aOk ? -1 : 1;
+    }
+    if (listSort === "management") {
+      const c = cmpManagementNumber(a.managementNumber, b.managementNumber);
+      if (c !== 0) return c;
+      return a.loginId.localeCompare(b.loginId);
+    }
+    if (a.hasSubmission && b.hasSubmission) {
+      const c = a.submittedAt.getTime() - b.submittedAt.getTime();
+      if (c !== 0) return c;
+      return a.loginId.localeCompare(b.loginId);
+    }
+    if (a.hasSubmission !== b.hasSubmission) {
+      return a.hasSubmission ? -1 : 1;
+    }
+    const c = cmpManagementNumber(a.managementNumber, b.managementNumber);
+    if (c !== 0) return c;
+    return a.loginId.localeCompare(b.loginId);
+  });
+
+  const rowsForClient = groupedRows.map(({ submittedAt: _submittedAt, managementNumber: _mn, ...row }) => row);
 
   return (
     <ApplicationsAdminClient
@@ -202,11 +259,12 @@ export default async function AdminApplicationsPage({
       userId={userId}
       q={q}
       sortFacility={sortFacility}
+      listSort={listSort}
       unsubmittedFirst={unsubmittedFirst}
       openMonth={openMonthConfig?.value ?? month}
-      users={users}
+      users={users.map(({ id, name, loginId }) => ({ id, name, loginId }))}
       facilities={facilities}
-      rows={groupedRows}
+      rows={rowsForClient}
     />
   );
 }

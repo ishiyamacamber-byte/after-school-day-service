@@ -12,6 +12,13 @@ function parseAllowedIds(raw: string): string[] {
   }
 }
 
+/** allowedFacilityIds が空なら制限なし（submit API と同様） */
+function userMayUseFacility(allowedFacilityIdsRaw: string | null | undefined, facilityId: string): boolean {
+  const ids = parseAllowedIds(allowedFacilityIdsRaw ?? "[]");
+  if (ids.length === 0) return true;
+  return ids.includes(facilityId);
+}
+
 export default async function AdminUsersPage({
   searchParams,
 }: {
@@ -40,8 +47,8 @@ export default async function AdminUsersPage({
 
   const users = [...usersRaw].sort((a, b) => {
     if (!sortAllowedFacility) return a.loginId.localeCompare(b.loginId);
-    const aAllowed = parseAllowedIds(a.allowedFacilityIds).includes(sortAllowedFacility);
-    const bAllowed = parseAllowedIds(b.allowedFacilityIds).includes(sortAllowedFacility);
+    const aAllowed = userMayUseFacility(a.allowedFacilityIds, sortAllowedFacility);
+    const bAllowed = userMayUseFacility(b.allowedFacilityIds, sortAllowedFacility);
     if (aAllowed !== bAllowed) return aAllowed ? -1 : 1;
     return a.loginId.localeCompare(b.loginId);
   });

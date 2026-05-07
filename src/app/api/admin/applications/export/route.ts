@@ -45,6 +45,8 @@ export async function GET(req: Request) {
   const userId = searchParams.get("userId") ?? "";
   const q = (searchParams.get("q") ?? "").trim();
   const { month, start, end } = monthRange(searchParams.get("month"));
+  const [yearNum, monthNum] = month.split("-").map(Number);
+  const monthLabelJa = `${yearNum}年${monthNum}月`;
 
   const [datedRows, users] = await Promise.all([
     prisma.application.findMany({
@@ -107,7 +109,7 @@ export async function GET(req: Request) {
         if (!list.includes(name)) list.push(name);
         cur.dayFacilities[day] = list;
       }
-      if (r.notes?.trim()) cur.dailyNotes.push(`${day}日: ${r.notes.trim()}`);
+      if (r.notes?.trim()) cur.dailyNotes.push(`${monthNum}/${day}: ${r.notes.trim()}`);
     } else if (r.notes?.trim()) {
       cur.overallNotes.push(r.notes.trim());
     }
@@ -157,16 +159,12 @@ export async function GET(req: Request) {
       })()
     : sorted;
 
-  const header = [
-    "管理番号",
-    "名前",
-    "ログインID",
-    ...Array.from({ length: 31 }, (_, i) => String(i + 1)),
-    "全体連絡事項",
-    "日別連絡事項",
-  ];
+  const dayHeaders = Array.from({ length: 31 }, (_, i) => `${monthNum}/${i + 1}`);
+  const header = ["管理番号", "名前", "ログインID", ...dayHeaders, "全体連絡事項", "日別連絡事項"];
 
-  const lines = [header.map(csvCell).join(",")];
+  const metaCells = [csvCell(`出力対象月: ${monthLabelJa}（${month}）`)];
+  for (let i = 1; i < header.length; i++) metaCells.push(csvCell(""));
+  const lines = [metaCells.join(","), header.map(csvCell).join(",")];
 
   for (const u of exportRows) {
     // 欠番スロット等: 管理番号だけあり名前が空の行は出力しない

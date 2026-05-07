@@ -5,12 +5,22 @@ import { useEffect, useState } from "react";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
+/** `yyyy-MM` → `2025年5月`（一覧の対象月表示用） */
+function formatMonthKeyToJapaneseLabel(yyyyMm: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(yyyyMm.trim());
+  if (!m) return yyyyMm;
+  return `${Number(m[1])}年${Number(m[2])}月`;
+}
+
 type Row = {
   userId: string;
   hasSubmission: boolean;
   submittedAtText: string;
   userName: string;
   loginId: string;
+  monthlyLimit: number;
+  /** 対象月に申請されている「日」の件数（同日は1回と数える） */
+  appliedDaysCount: number;
   dayFacilities: Record<number, string[]>;
   overallNotes: string[];
   dailyNotes: string[];
@@ -39,6 +49,7 @@ export function ApplicationsAdminClient({
   userId,
   q,
   sortFacility,
+  listSort,
   unsubmittedFirst,
   openMonth,
   rows,
@@ -49,6 +60,8 @@ export function ApplicationsAdminClient({
   userId: string;
   q: string;
   sortFacility: string;
+  /** submitted | management（サーバー側ソート用クエリの反映） */
+  listSort: "submitted" | "management";
   unsubmittedFirst: boolean;
   openMonth: string;
   rows: Row[];
@@ -136,8 +149,10 @@ export function ApplicationsAdminClient({
     router.refresh();
   }
 
+  const monthLabelJa = formatMonthKeyToJapaneseLabel(month);
+
   async function deleteUserMonth(targetUserId: string) {
-    if (!confirm(`この利用者の ${month} 申請を削除します。よろしいですか？`)) return;
+    if (!confirm(`この利用者の ${monthLabelJa}（${month}）の申請を削除します。よろしいですか？`)) return;
     setBusyUserId(targetUserId);
     setMessage("");
     const res = await fetch("/api/admin/applications/user-month", {
@@ -352,19 +367,30 @@ export function ApplicationsAdminClient({
   const sortedPreviewDays = [...editDays].sort((a, b) => a.date.localeCompare(b.date));
   const selectedEditDay = editDays.find((d) => d.date === selectedEditDate) ?? null;
 
+  /** sortFacility はクエリ上は事業所 ID。行内の強調表示は名前で付ける */
+  const sortFacilityHighlightName = facilities.find((f) => f.id === sortFacility)?.name ?? "";
+
   const csvHref =
     `/api/admin/applications/export?month=${encodeURIComponent(month)}` +
     (userId ? `&userId=${encodeURIComponent(userId)}` : "") +
     (q ? `&q=${encodeURIComponent(q)}` : "") +
-    (sortFacility ? `&sortFacility=${encodeURIComponent(sortFacility)}` : "");
+    (sortFacility ? `&sortFacility=${encodeURIComponent(sortFacility)}` : "") +
+    `&listSort=${encodeURIComponent(listSort)}`;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-bold text-slate-900">申請一覧</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900">申請一覧</h1>
+          <p className="mt-1 text-sm text-slate-700">
+            表示中の対象月:{" "}
+            <span className="font-semibold text-slate-900">{monthLabelJa}</span>
+            <span className="text-slate-500">（{month}）</span>
+          </p>
+        </div>
         <a
           href={csvHref}
-          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 active:bg-slate-50"
+          className="shrink-0 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 active:bg-slate-50 sm:self-center"
         >
           CSV出力
         </a>
@@ -448,13 +474,16 @@ export function ApplicationsAdminClient({
       <form className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200" method="get">
         <div className="grid grid-cols-1 gap-3">
           <label className="text-sm font-medium text-slate-700">
-            月
+            表示する月
             <input
               type="month"
               name="month"
               defaultValue={month}
               className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
             />
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              現在の一覧: <strong className="text-slate-700">{monthLabelJa}</strong> の申請データです。
+            </span>
           </label>
           <label className="text-sm font-medium text-slate-700">
             利用者（プルダウン）
@@ -489,7 +518,7 @@ export function ApplicationsAdminClient({
             </datalist>
           </label>
           <label className="text-sm font-medium text-slate-700">
-            並び替え（事業所の利用日数が多い順）
+            並び替え（利用可能事業所に含まれる人を先頭）
             <select
               name="sortFacility"
               defaultValue={sortFacility}
@@ -497,10 +526,21 @@ export function ApplicationsAdminClient({
             >
               <option value="">指定なし（ログインID順）</option>
               {facilities.map((f) => (
-                <option key={f.id} value={f.name}>
+                <option key={f.id} value={f.id}>
                   {f.name}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            並び順の基準
+            <select
+              name="listSort"
+              defaultValue={listSort}
+              className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
+            >
+              <option value="submitted">申請順（申請日時が早い順）</option>
+              <option value="management">管理番号順（番号なしは末尾）</option>
             </select>
           </label>
           <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -515,7 +555,8 @@ export function ApplicationsAdminClient({
           </label>
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          並び替えを選ぶと、その事業所の日数が多い利用者が上に来ます。各行ではその利用者の全事業所の利用日数を表示します。
+          事業所を選ぶと、その事業所が<strong>利用可能に設定されている</strong>利用者が上に並びます（申請の利用日数とは無関係）。
+          「並び順の基準」はそのあとの並べ替えです（利用可能事業所の順・未申請を先頭はいずれより優先）。申請順は同一月の<strong>提出が早い順</strong>です。
         </p>
         <button
           type="submit"
@@ -528,7 +569,7 @@ export function ApplicationsAdminClient({
       {message && <p className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-800">{message}</p>}
 
       <div className="text-sm text-slate-600">
-        {month} の利用者件数: {rows.length}件
+        <span className="font-medium text-slate-800">{monthLabelJa}</span>（{month}）の利用者件数: {rows.length}件
       </div>
 
       <div className="flex flex-col gap-2">
@@ -566,22 +607,38 @@ export function ApplicationsAdminClient({
                   disabled={busyUserId === r.userId || savingEdit}
                   className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 disabled:opacity-60"
                 >
-                  {busyUserId === r.userId ? "削除中..." : `${month}申請を削除`}
+                  {busyUserId === r.userId ? "削除中..." : `${monthLabelJa}の申請を削除`}
                 </button>
               </div>
             </div>
             <div className="mt-1 text-xs text-slate-600">申請日時: {r.submittedAtText}</div>
             <div className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800">
-              <span className="font-medium text-slate-600">事業所別利用日数: </span>
-              {r.facilityCountsList.length > 0
-                ? r.facilityCountsList.map(({ name, days }) => (
-                    <span key={name} className="mr-2 inline-block">
-                      <span className={sortFacility === name ? "font-bold text-blue-800" : ""}>
-                        {name} {days}日
-                      </span>
-                    </span>
-                  ))
-                : "—"}
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <span>
+                  <span className="font-medium text-slate-600">事業所別利用日数: </span>
+                  {r.facilityCountsList.length > 0
+                    ? r.facilityCountsList.map(({ name, days }) => (
+                        <span key={name} className="mr-2 inline-block">
+                          <span className={sortFacilityHighlightName === name ? "font-bold text-blue-800" : ""}>
+                            {name} {days}日
+                          </span>
+                        </span>
+                      ))
+                    : "—"}
+                </span>
+                <span>
+                  <span className="font-medium text-slate-600">申請利用日数 / 月上限: </span>
+                  <span
+                    className={
+                      r.appliedDaysCount > r.monthlyLimit
+                        ? "font-semibold tabular-nums text-red-600"
+                        : "tabular-nums text-slate-900"
+                    }
+                  >
+                    {r.appliedDaysCount}/{r.monthlyLimit}
+                  </span>
+                </span>
+              </div>
             </div>
             <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="grid grid-cols-7 gap-1">
@@ -655,7 +712,7 @@ export function ApplicationsAdminClient({
                   {editStep === "form" ? "申請内容の編集" : "保存前の確認"}
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-600">
-                  {editTarget.userName}（{editTarget.loginId}）・{month}
+                  {editTarget.userName}（{editTarget.loginId}）・{monthLabelJa}
                 </p>
               </div>
               <button
@@ -864,7 +921,7 @@ export function ApplicationsAdminClient({
                   変更履歴
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-600">
-                  {historyTarget.userName}・{month}
+                  {historyTarget.userName}・{monthLabelJa}
                 </p>
               </div>
               <button
