@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ApplicationsAdminClient } from "@/components/admin/applications-admin-client";
 import { countDaysByFacility, facilityCountsList } from "@/lib/admin-application-list";
+import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 
 function parseAllowedIds(raw: string | null | undefined): string[] {
   try {
@@ -86,7 +87,7 @@ export default async function AdminApplicationsPage({
       },
     }),
     prisma.systemConfig.findUnique({ where: { key: "open_month" } }),
-    prisma.facility.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.facility.findMany({ orderBy: FACILITY_LIST_ORDER_BY, select: { id: true, name: true } }),
   ]);
 
   const targetGroupIds = [...new Set(datedRows.map((r) => r.groupId))];

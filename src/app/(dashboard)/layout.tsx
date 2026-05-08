@@ -34,6 +34,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 一覧
               </Link>
               <Link
+                href="/admin/facilities"
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 active:bg-slate-50"
+              >
+                事業所
+              </Link>
+              <Link
                 href="/admin/import"
                 className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 active:bg-slate-50"
               >

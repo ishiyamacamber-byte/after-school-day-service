@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ApplyPageClient } from "@/components/apply/apply-page-client";
 import { queryAdminEditLogsForTargetMonth } from "@/lib/application-admin-edit-log";
+import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { monthEndExclusive, monthStart, toMonthKey } from "@/lib/month";
 
 type SnapshotPayload = {
@@ -66,7 +67,7 @@ export default async function ApplyPage() {
       where: { id: session.user.id },
       select: { id: true, defaultSchedule: true, allowedFacilityIds: true, monthlyLimit: true },
     }),
-    prisma.facility.findMany({ orderBy: { name: "asc" } }),
+    prisma.facility.findMany({ orderBy: FACILITY_LIST_ORDER_BY }),
     prisma.systemConfig.findUnique({ where: { key: "open_month" } }),
   ]);
 
@@ -132,7 +133,9 @@ export default async function ApplyPage() {
   const latestSubmittedAt = dayApps.length > 0 ? dayApps[dayApps.length - 1]!.submittedAt : null;
 
   const facilityNameById = new Map(
-    (await prisma.facility.findMany({ select: { id: true, name: true } })).map((f) => [f.id, f.name])
+    (await prisma.facility.findMany({ orderBy: FACILITY_LIST_ORDER_BY, select: { id: true, name: true } })).map(
+      (f) => [f.id, f.name]
+    )
   );
 
   const adminEditLogs = await queryAdminEditLogsForTargetMonth(prisma, user.id, openMonth);

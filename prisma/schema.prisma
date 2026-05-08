@@ -35,6 +35,8 @@ enum UserRole {
 model Facility {
   id            String         @id @default(cuid())
   name          String
+  /// 一覧・プルダウンでの表示順（昇順。同値のときは名前順）
+  sortOrder     Int            @default(0) @map("sort_order")
   applications  Application[]
 
   @@map("facilities")

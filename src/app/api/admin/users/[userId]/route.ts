@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 const patchSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
   monthlyLimit: z.number().int().min(0).max(31).optional(),
   defaultSchedule: z.string().optional(),
   allowedFacilityIds: z.string().optional(),
@@ -31,6 +32,7 @@ export async function PATCH(
   }
 
   const data: {
+    name?: string;
     monthlyLimit?: number;
     defaultSchedule?: string;
     allowedFacilityIds?: string;
@@ -46,6 +48,7 @@ export async function PATCH(
     return NextResponse.json({ error: "user_not_found" }, { status: 404 });
   }
 
+  if (parsed.data.name !== undefined) data.name = parsed.data.name;
   if (parsed.data.monthlyLimit !== undefined) data.monthlyLimit = parsed.data.monthlyLimit;
   if (parsed.data.defaultSchedule !== undefined) {
     try {

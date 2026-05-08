@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { appendApplicationRows } from "@/lib/google-sheets";
+import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { isDateInMonthKey, monthEndExclusive, monthStart, toMonthKey } from "@/lib/month";
 
 const daySchema = z.object({
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
   const facilities = await prisma.facility.findMany({
     where: { id: { in: facilityIds } },
     select: { id: true, name: true },
+    orderBy: FACILITY_LIST_ORDER_BY,
   });
   const facilityName = (id: string) => facilities.find((f) => f.id === id)?.name ?? id;
 

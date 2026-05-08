@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
 
   const [existingLogin, facilities] = await Promise.all([
     prisma.user.findUnique({ where: { loginId } }),
-    prisma.facility.findMany({ select: { id: true } }),
+    prisma.facility.findMany({ select: { id: true }, orderBy: FACILITY_LIST_ORDER_BY }),
   ]);
   if (existingLogin) {
     return NextResponse.json({ error: "login_id_already_exists" }, { status: 409 });

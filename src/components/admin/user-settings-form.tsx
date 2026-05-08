@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -24,6 +24,7 @@ export function UserSettingsForm({
   facilities: Facility[];
 }) {
   const router = useRouter();
+  const [name, setName] = useState(user.name);
   const [loginId, setLoginId] = useState(user.loginId);
   const [password, setPassword] = useState("");
   const [managementNumber, setManagementNumber] = useState(
@@ -55,9 +56,19 @@ export function UserSettingsForm({
   const [deleting, setDeleting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    setName(user.name);
+  }, [user.name]);
+
   async function onSave() {
     setSaving(true);
     setMsg(null);
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setSaving(false);
+      setMsg("氏名を入力してください。");
+      return;
+    }
     const default_schedule: Record<string, string> = {};
     for (let i = 0; i < 7; i++) {
       const v = byWeekday[i];
@@ -67,6 +78,7 @@ export function UserSettingsForm({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        name: trimmedName,
         loginId,
         password: password || undefined,
         managementNumber: managementNumber ? Number(managementNumber) : null,
@@ -99,7 +111,7 @@ export function UserSettingsForm({
       setMsg("ADMINユーザーは削除できません。");
       return;
     }
-    if (!confirm(`${user.name}（${user.loginId}）を削除します。よろしいですか？`)) return;
+    if (!confirm(`${name.trim() || user.name}（${loginId}）を削除します。よろしいですか？`)) return;
     setDeleting(true);
     setMsg(null);
     const res = await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
@@ -120,13 +132,21 @@ export function UserSettingsForm({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-lg font-bold text-slate-900">{user.name}</h1>
+        <h1 className="text-lg font-bold text-slate-900">{name.trim() || "（氏名未入力）"}</h1>
         <p className="text-sm text-slate-600">
-          {user.loginId} · {user.role}
+          {loginId} · {user.role}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-800 md:col-span-2">
+          氏名
+          <input
+            className="min-h-12 rounded-xl border border-slate-300 px-3 text-base"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-800">
           ログインID
           <input

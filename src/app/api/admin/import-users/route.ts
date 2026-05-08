@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decodeCsvUpload, parseCsv } from "@/lib/csv";
+import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { isExcelUpload, parseExcelFirstSheetToRows } from "@/lib/excel-import";
 
 const weekdayColumns = [
@@ -86,6 +87,7 @@ export async function POST(req: Request) {
 
   const facilities = await prisma.facility.findMany({
     select: { id: true, name: true },
+    orderBy: FACILITY_LIST_ORDER_BY,
   });
   const idByName = new Map(facilities.map((f) => [f.name, f.id]));
   const validIds = new Set(facilities.map((f) => f.id));

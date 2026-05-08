@@ -12,43 +12,25 @@ async function main() {
     return;
   }
 
-  const facilities = await Promise.all([
-    prisma.facility.upsert({
-      where: { id: "seed-fac-1" },
-      update: { name: "オーパ" },
-      create: { id: "seed-fac-1", name: "オーパ" },
-    }),
-    prisma.facility.upsert({
-      where: { id: "seed-fac-2" },
-      update: { name: "セカンド" },
-      create: { id: "seed-fac-2", name: "セカンド" },
-    }),
-    prisma.facility.upsert({
-      where: { id: "seed-fac-3" },
-      update: { name: "サード" },
-      create: { id: "seed-fac-3", name: "サード" },
-    }),
-    prisma.facility.upsert({
-      where: { id: "seed-fac-4" },
-      update: { name: "ネクスト" },
-      create: { id: "seed-fac-4", name: "ネクスト" },
-    }),
-    prisma.facility.upsert({
-      where: { id: "seed-fac-5" },
-      update: { name: "アスリート" },
-      create: { id: "seed-fac-5", name: "アスリート" },
-    }),
-    prisma.facility.upsert({
-      where: { id: "seed-fac-6" },
-      update: { name: "チャレンジ" },
-      create: { id: "seed-fac-6", name: "チャレンジ" },
-    }),
-    prisma.facility.upsert({
-      where: { id: "seed-fac-7" },
-      update: { name: "ステップ" },
-      create: { id: "seed-fac-7", name: "ステップ" },
-    }),
-  ]);
+  const facilitySeeds = [
+    { id: "seed-fac-1", name: "オーパ", sortOrder: 10 },
+    { id: "seed-fac-2", name: "セカンド", sortOrder: 20 },
+    { id: "seed-fac-3", name: "サード", sortOrder: 30 },
+    { id: "seed-fac-4", name: "ネクスト", sortOrder: 40 },
+    { id: "seed-fac-5", name: "アスリート", sortOrder: 50 },
+    { id: "seed-fac-6", name: "チャレンジ", sortOrder: 60 },
+    { id: "seed-fac-7", name: "ステップ", sortOrder: 70 },
+  ] as const;
+
+  const facilities = await Promise.all(
+    facilitySeeds.map((f) =>
+      prisma.facility.upsert({
+        where: { id: f.id },
+        update: { name: f.name, sortOrder: f.sortOrder },
+        create: { id: f.id, name: f.name, sortOrder: f.sortOrder },
+      })
+    )
+  );
 
   const defaultSchedule = JSON.stringify({
     "1": facilities[0].id,

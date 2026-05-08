@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { CreateUserForm } from "@/components/admin/create-user-form";
+import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 
 function parseAllowedIds(raw: string): string[] {
   try {
@@ -40,7 +41,7 @@ export default async function AdminUsersPage({
       },
     }),
     prisma.facility.findMany({
-      orderBy: { name: "asc" },
+      orderBy: FACILITY_LIST_ORDER_BY,
       select: { id: true, name: true },
     }),
   ]);
@@ -55,14 +56,22 @@ export default async function AdminUsersPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-bold text-slate-900">利用者・設定</h1>
-        <Link
-          href="/admin/import"
-          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 active:bg-slate-50"
-        >
-          CSV取込
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href="/admin/facilities"
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 active:bg-slate-50"
+          >
+            事業所
+          </Link>
+          <Link
+            href="/admin/import"
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 active:bg-slate-50"
+          >
+            CSV取込
+          </Link>
+        </div>
       </div>
       <CreateUserForm />
       <form method="get" className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserSettingsForm } from "@/components/admin/user-settings-form";
+import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 
 export default async function AdminUserEditPage({ params }: { params: Promise<{ userId: string }> }) {
   const session = await getServerSession(authOptions);
@@ -11,7 +12,7 @@ export default async function AdminUserEditPage({ params }: { params: Promise<{ 
   const { userId } = await params;
   const [user, facilities] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
-    prisma.facility.findMany({ orderBy: { name: "asc" } }),
+    prisma.facility.findMany({ orderBy: FACILITY_LIST_ORDER_BY }),
   ]);
 
   if (!user) {
