@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DayPicker } from "react-day-picker";
 import { ja } from "date-fns/locale";
 import { format } from "date-fns";
-import "react-day-picker/style.css";
 import { getDefaultFacilityIdForDate } from "@/lib/default-schedule";
 import { SubmittedCalendar } from "@/components/apply/submitted-calendar";
 
@@ -132,6 +130,16 @@ export function ApplyPageClient({
     });
   }
 
+  function toggleDate(d: Date) {
+    const key = dateKey(d);
+    const exists = selected.some((x) => dateKey(x) === key);
+    if (exists) {
+      onSelectMulti(selected.filter((x) => dateKey(x) !== key));
+      return;
+    }
+    onSelectMulti([...selected, d]);
+  }
+
   function datesInOpenMonthForWeekday(weekday: number): Date[] {
     const out: Date[] = [];
     const y = openMonthDate.getFullYear();
@@ -199,6 +207,19 @@ export function ApplyPageClient({
   }
 
   const sortedSelected = [...selected].sort((a, b) => a.getTime() - b.getTime());
+  const firstDow = new Date(oy, om - 1, 1).getDay();
+  const daysInMonth = openMonthEnd.getDate();
+
+  function facilityLabelForDate(d: Date): string {
+    const key = dateKey(d);
+    const selectedEntry = byDate[key];
+    if (selectedEntry) {
+      return facilities.find((f) => f.id === selectedEntry.facilityId)?.name ?? "";
+    }
+    const defaultFacilityId = getDefaultFacilityIdForDate(user.defaultSchedule, d);
+    if (!defaultFacilityId) return "";
+    return facilities.find((f) => f.id === defaultFacilityId)?.name ?? "";
+  }
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -387,25 +408,68 @@ export function ApplyPageClient({
                 ))}
               </div>
             </div>
-            <DayPicker
-              mode="multiple"
-              locale={ja}
-              month={month}
-              startMonth={openMonthDate}
-              endMonth={openMonthDate}
-              hidden={[{ before: openMonthStart }, { after: openMonthEnd }]}
-              selected={selected}
-              onSelect={onSelectMulti}
-              className="mx-auto"
-              classNames={{
-                day: "h-[4.75rem] w-[3rem]",
-                day_button:
-                  "h-[4.75rem] w-[3rem] rounded-xl border border-slate-200 bg-white p-0 text-left hover:bg-blue-50",
-                selected:
-                  "border-blue-500 bg-blue-50 ring-2 ring-blue-200",
-                today: "border-slate-300",
-              }}
-            />
+            <div className="w-full min-w-[20rem] sm:min-w-[36rem]">
+              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                {WEEKDAY_SHORT.map((w, idx) => (
+                  <div
+                    key={`apply-weekday-${w}`}
+                    className={`rounded-lg py-1.5 text-center text-[11px] font-bold sm:text-xs ${
+                      idx === 0 ? "bg-red-50 text-red-700" : idx === 6 ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {w}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 grid grid-cols-7 gap-1.5 sm:gap-2">
+                {Array.from({ length: firstDow }, (_, i) => (
+                  <div key={`apply-pad-${i}`} className="min-h-[5rem] rounded-2xl border border-transparent bg-slate-50/30" />
+                ))}
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const day = i + 1;
+                  const d = new Date(oy, om - 1, day);
+                  const key = dateKey(d);
+                  const isSelected = selected.some((x) => dateKey(x) === key);
+                  const label = facilityLabelForDate(d);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleDate(d)}
+                      className={`flex min-h-[5rem] flex-col rounded-2xl border-2 p-2 text-left sm:min-h-[5.5rem] sm:p-2.5 ${
+                        isSelected
+                          ? "border-blue-400 bg-gradient-to-b from-blue-50 to-white shadow-sm"
+                          : "border-slate-100 bg-slate-50/90"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 border-b border-slate-200/80 pb-1">
+                        <span
+                          className={`text-base font-bold leading-none tabular-nums sm:text-lg ${
+                            isSelected ? "text-slate-900" : "text-slate-500"
+                          }`}
+                        >
+                          {day}
+                        </span>
+                        <span className="text-[11px] text-slate-500 sm:text-xs">
+                          {format(d, "E", { locale: ja })}
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-1.5 line-clamp-4 text-left text-[11px] leading-snug sm:text-xs ${
+                          label
+                            ? isSelected
+                              ? "font-bold text-blue-950"
+                              : "text-slate-700"
+                            : "text-transparent"
+                        }`}
+                      >
+                        {label || "　"}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
