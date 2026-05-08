@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import { ja } from "date-fns/locale";
@@ -199,46 +199,6 @@ export function ApplyPageClient({
   }
 
   const sortedSelected = [...selected].sort((a, b) => a.getTime() - b.getTime());
-  const facilityNameById = useMemo(
-    () => new Map(facilities.map((f) => [f.id, f.name])),
-    [facilities]
-  );
-  const selectedKeySet = useMemo(() => new Set(selected.map((d) => dateKey(d))), [selected]);
-
-  function resolveDefaultFacilityName(d: Date): string {
-    const def = getDefaultFacilityIdForDate(user.defaultSchedule, d);
-    if (!def) return "";
-    return facilityNameById.get(def) ?? "";
-  }
-
-  function facilityLabelForDate(d: Date): string {
-    const key = dateKey(d);
-    if (selectedKeySet.has(key)) {
-      const e = byDate[key] ?? ensureEntry(d);
-      return facilityNameById.get(e.facilityId) ?? "";
-    }
-    return resolveDefaultFacilityName(d);
-  }
-
-  function CalendarDayContent({ date }: { date: Date }) {
-    const isSelected = selectedKeySet.has(dateKey(date));
-    const label = facilityLabelForDate(date);
-    return (
-      <div className="flex h-full w-full flex-col items-start p-1.5 text-left">
-        <span className={`text-xs font-bold tabular-nums ${isSelected ? "text-slate-900" : "text-slate-500"}`}>
-          {date.getDate()}
-        </span>
-        <span
-          className={`mt-1 line-clamp-3 text-[10px] leading-tight ${
-            label ? (isSelected ? "font-semibold text-blue-950" : "text-slate-700") : "text-slate-300"
-          }`}
-        >
-          {label || " "}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -445,7 +405,6 @@ export function ApplyPageClient({
                   "border-blue-500 bg-blue-50 ring-2 ring-blue-200",
                 today: "border-slate-300",
               }}
-              components={{ DayContent: CalendarDayContent }}
             />
           </div>
 
