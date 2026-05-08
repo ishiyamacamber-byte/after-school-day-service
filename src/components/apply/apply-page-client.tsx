@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DayPicker, type DayContentProps } from "react-day-picker";
+import { DayPicker } from "react-day-picker";
 import { ja } from "date-fns/locale";
 import { format } from "date-fns";
 import "react-day-picker/style.css";
@@ -220,7 +220,7 @@ export function ApplyPageClient({
     return resolveDefaultFacilityName(d);
   }
 
-  function CalendarDayContent({ date }: DayContentProps) {
+  function CalendarDayContent({ date }: { date: Date }) {
     const isSelected = selectedKeySet.has(dateKey(date));
     const label = facilityLabelForDate(date);
     return (
