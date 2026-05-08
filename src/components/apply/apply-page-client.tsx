@@ -47,6 +47,8 @@ function dateKey(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
+const WEEKDAY_SHORT = ["日", "月", "火", "水", "木", "金", "土"] as const;
+
 export function ApplyPageClient({
   user,
   facilities,
@@ -128,6 +130,27 @@ export function ApplyPageClient({
       }
       return n;
     });
+  }
+
+  function datesInOpenMonthForWeekday(weekday: number): Date[] {
+    const out: Date[] = [];
+    const y = openMonthDate.getFullYear();
+    const m = openMonthDate.getMonth();
+    const lastDay = openMonthEnd.getDate();
+    for (let day = 1; day <= lastDay; day++) {
+      const d = new Date(y, m, day);
+      if (d.getDay() === weekday) out.push(d);
+    }
+    return out;
+  }
+
+  function selectAllForWeekday(weekday: number) {
+    const add = datesInOpenMonthForWeekday(weekday);
+    if (add.length === 0) return;
+    const map = new Map<string, Date>();
+    for (const d of selected) map.set(dateKey(d), d);
+    for (const d of add) map.set(dateKey(d), d);
+    onSelectMulti([...map.values()]);
   }
 
   async function onSubmit() {
@@ -344,6 +367,27 @@ export function ApplyPageClient({
       {!hasSubmitted && (
         <>
           <div className="apply-calendar overflow-x-auto rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+            <div className="mb-3">
+              <p className="text-xs font-medium text-slate-600">曜日を一括選択</p>
+              <div className="mt-2 grid grid-cols-7 gap-1.5">
+                {WEEKDAY_SHORT.map((w, idx) => (
+                  <button
+                    key={`weekday-bulk-${w}`}
+                    type="button"
+                    onClick={() => selectAllForWeekday(idx)}
+                    className={`min-h-9 rounded-lg border text-xs font-semibold ${
+                      idx === 0
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : idx === 6
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
             <DayPicker
               mode="multiple"
               locale={ja}
