@@ -11,6 +11,8 @@ services:
     environment:
       # コンテナ内の SQLite パス（ホストの ./data に永続化）
       DATABASE_URL: file:/app/data/prod.db
+      # 表示用の日時を日本時間に合わせる
+      TZ: Asia/Tokyo
     volumes:
       - sqlite-data:/app/data
     restart: unless-stopped
