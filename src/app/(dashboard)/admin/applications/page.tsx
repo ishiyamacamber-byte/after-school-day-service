@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { authOptions } from "@/lib/auth";
+import { formatDateTimeJapan } from "@/lib/datetime-japan";
 import { prisma } from "@/lib/prisma";
 import { ApplicationsAdminClient } from "@/components/admin/applications-admin-client";
 import { countDaysByFacility, facilityCountsList } from "@/lib/admin-application-list";
@@ -133,7 +134,7 @@ export default async function AdminApplicationsPage({
       userName: r.user.name,
       loginId: r.user.loginId,
       submittedAt: r.submittedAt,
-      submittedAtText: format(r.submittedAt, "yyyy-MM-dd HH:mm"),
+      submittedAtText: formatDateTimeJapan(r.submittedAt),
       dayFacilities: {},
       overallNotes: [],
       dailyNotes: [],
@@ -144,7 +145,7 @@ export default async function AdminApplicationsPage({
     };
     if (r.submittedAt > current.submittedAt) {
       current.submittedAt = r.submittedAt;
-      current.submittedAtText = format(r.submittedAt, "yyyy-MM-dd HH:mm");
+      current.submittedAtText = formatDateTimeJapan(r.submittedAt);
     }
     if (r.date) {
       const day = r.date.getDate();

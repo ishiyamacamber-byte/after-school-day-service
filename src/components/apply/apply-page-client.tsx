@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ja } from "date-fns/locale";
 import { format } from "date-fns";
+import { formatDateTimeJapan } from "@/lib/datetime-japan";
 import { getDefaultFacilityIdForDate } from "@/lib/default-schedule";
 import { SubmittedCalendar } from "@/components/apply/submitted-calendar";
 
@@ -199,7 +200,7 @@ export function ApplyPageClient({
       return;
     }
     setMessage("申請を受け付けました。");
-    setSubmittedAtText(format(new Date(), "yyyy-MM-dd HH:mm"));
+    setSubmittedAtText(formatDateTimeJapan(new Date()));
     setSubmittedNow(true);
     setSelected([]);
     setByDate({});

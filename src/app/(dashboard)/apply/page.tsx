@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { authOptions } from "@/lib/auth";
+import { formatDateTimeJapan } from "@/lib/datetime-japan";
 import { prisma } from "@/lib/prisma";
 import { ApplyPageClient } from "@/components/apply/apply-page-client";
 import { queryAdminEditLogsForTargetMonth } from "@/lib/application-admin-edit-log";
@@ -49,7 +50,7 @@ function buildUserAdminEditHistory(
     }
     return {
       id: log.id,
-      editedAtText: format(log.editedAt, "yyyy-MM-dd HH:mm"),
+      editedAtText: formatDateTimeJapan(log.editedAt),
       editorName: log.editorName,
       editorLoginId: log.editorLoginId,
       overallNotes,
@@ -159,7 +160,7 @@ export default async function ApplyPage() {
         monthlyLimit: user.monthlyLimit,
         openMonth,
         alreadySubmitted: hasOpenMonthSubmission,
-        submittedAtText: latestSubmittedAt ? format(latestSubmittedAt, "yyyy-MM-dd HH:mm") : null,
+        submittedAtText: latestSubmittedAt ? formatDateTimeJapan(latestSubmittedAt) : null,
         submissionSummary: openMonthSummary,
         summariesByMonth,
         submittedMonths,
