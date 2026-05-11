@@ -1,35 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { ensureExtraAdminUsers } from "./ensure-extra-admins-logic";
 
 const prisma = new PrismaClient();
-
-/** 既存DBでも毎回 upsert する追加管理者（ログインID admin100 … admin105。パスワードは admin と同じ）。 */
-async function ensureAdditionalAdminUsers() {
-  const facilities = await prisma.facility.findMany({
-    select: { id: true },
-    orderBy: { name: "asc" },
-  });
-  const allowedFacilityIds = JSON.stringify(facilities.map((f) => f.id));
-  const adminPasswordHash = await bcrypt.hash("opa1224", 10);
-  const extraAdmins = [100, 101, 102, 103, 104, 105] as const;
-  for (const n of extraAdmins) {
-    const loginId = `admin${n}`;
-    const fields = {
-      name: `デモ管理者${n}`,
-      passwordHash: adminPasswordHash,
-      defaultSchedule: "{}",
-      allowedFacilityIds,
-      monthlyLimit: 31,
-      role: "ADMIN" as const,
-    };
-    await prisma.user.upsert({
-      where: { loginId },
-      update: fields,
-      create: { loginId, ...fields },
-    });
-  }
-  console.log("Additional admin users ensured:", extraAdmins.map((n) => `admin${n}`).join(", "));
-}
 
 async function main() {
   const existingUsers = await prisma.user.count();
@@ -120,7 +93,7 @@ async function main() {
   console.log("Seed OK:", { facilities: facilities.length, openMonth });
   }
 
-  await ensureAdditionalAdminUsers();
+  await ensureExtraAdminUsers(prisma);
 }
 
 main()

@@ -4,4 +4,5 @@ set -e
 mkdir -p /app/data
 chown -R nextjs:nodejs /app/data
 
-exec gosu nextjs sh -c "npx prisma db push && npx prisma db seed && exec node server.js"
+# seed が途中で失敗しても追加管理者を入れられるよう、db push の直後に ensure を実行する
+exec gosu nextjs sh -c "npx prisma db push && npx tsx prisma/run-ensure-extra-admins.ts && npx prisma db seed && exec node server.js"
