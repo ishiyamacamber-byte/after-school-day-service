@@ -198,15 +198,27 @@ export async function POST(req: Request) {
     }
 
     if (existing) {
+      const bcryptMod = await import("bcryptjs");
+      const updateData: {
+        name: string;
+        monthlyLimit: number;
+        defaultSchedule: string;
+        allowedFacilityIds: string;
+        managementNumber: number;
+        passwordHash?: string;
+      } = {
+        name,
+        monthlyLimit,
+        defaultSchedule: JSON.stringify(defaultSchedule),
+        allowedFacilityIds: JSON.stringify(allowedFacilityIds),
+        managementNumber,
+      };
+      if (passwordRaw) {
+        updateData.passwordHash = await bcryptMod.hash(passwordRaw, 10);
+      }
       await prisma.user.update({
         where: { loginId },
-        data: {
-          name,
-          monthlyLimit,
-          defaultSchedule: JSON.stringify(defaultSchedule),
-          allowedFacilityIds: JSON.stringify(allowedFacilityIds),
-          managementNumber,
-        },
+        data: updateData,
       });
       result.updated++;
     } else {

@@ -98,6 +98,14 @@ export function UserSettingsForm({
         setMsg("この管理番号は既に使われています。");
         return;
       }
+      if (j.error === "password_too_short") {
+        setMsg("パスワードを変更する場合は4文字以上にしてください（空欄のままならパスワードは変わりません）。");
+        return;
+      }
+      if (j.error === "invalid") {
+        setMsg("入力内容が不正です。パスワードは4文字以上、または空欄にしてください。");
+        return;
+      }
       setMsg("保存に失敗しました。");
       return;
     }

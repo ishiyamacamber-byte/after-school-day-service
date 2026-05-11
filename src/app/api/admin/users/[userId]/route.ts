@@ -11,7 +11,8 @@ const patchSchema = z.object({
   defaultSchedule: z.string().optional(),
   allowedFacilityIds: z.string().optional(),
   loginId: z.string().trim().min(1).optional(),
-  password: z.string().min(4).optional(),
+  /** 空・未送信は変更なし。4文字未満はハンドラで 400 password_too_short */
+  password: z.string().max(500).optional(),
   managementNumber: z.number().int().min(1).nullable().optional(),
 });
 
@@ -86,8 +87,15 @@ export async function PATCH(
     }
     data.loginId = parsed.data.loginId;
   }
-  if (parsed.data.password !== undefined) {
-    data.passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  const pwdRaw = parsed.data.password;
+  if (pwdRaw !== undefined) {
+    const pwd = pwdRaw.trim();
+    if (pwd.length > 0) {
+      if (pwd.length < 4) {
+        return NextResponse.json({ error: "password_too_short" }, { status: 400 });
+      }
+      data.passwordHash = await bcrypt.hash(pwd, 10);
+    }
   }
   if (parsed.data.managementNumber !== undefined) {
     if (parsed.data.managementNumber !== null) {
