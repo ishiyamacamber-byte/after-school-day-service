@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { deleteApplicationsForCalendarMonth, whereApplicationsForCalendarMonth } from "@/lib/application-calendar-month";
 import { prisma } from "@/lib/prisma";
+import { removeScheduleImage } from "@/lib/schedule-image-storage";
 import { Prisma } from "@prisma/client";
 
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
 
   const whereApp = await whereApplicationsForCalendarMonth(prisma, month);
 
-  const [applicationRowCount, byUser, logAgg] = await Promise.all([
+  const [applicationRowCount, byUser, logAgg, scheduleImageCount] = await Promise.all([
     prisma.application.count({ where: whereApp }),
     prisma.application.groupBy({
       by: ["userId"],
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
     prisma.$queryRaw<[{ n: bigint }]>(Prisma.sql`
       SELECT COUNT(*) AS n FROM "application_admin_edit_logs" WHERE "month" = ${month}
     `),
+    prisma.facilityMonthlyScheduleImage.count({ where: { month } }),
   ]);
 
   const editLogCount = Number(logAgg[0]?.n ?? 0);
@@ -47,6 +49,7 @@ export async function GET(req: Request) {
     applicationRowCount,
     userCount: byUser.length,
     editLogCount,
+    scheduleImageCount,
   });
 }
 
@@ -62,17 +65,32 @@ export async function POST(req: Request) {
 
   const { month } = parsed.data;
 
-  const deletedApplications = await prisma.$transaction(async (tx) => {
+  const deleted = await prisma.$transaction(async (tx) => {
+    const scheduleRows = await tx.facilityMonthlyScheduleImage.findMany({
+      where: { month },
+      select: { filePath: true },
+    });
     const r = await deleteApplicationsForCalendarMonth(tx, month);
     await tx.$executeRaw(Prisma.sql`
       DELETE FROM "application_admin_edit_logs" WHERE "month" = ${month}
     `);
-    return r.count;
+    await tx.facilityMonthlyScheduleImage.deleteMany({ where: { month } });
+    return { deletedApplications: r.count, scheduleRows };
   });
+
+  let scheduleImageDeleteWarning: string | undefined;
+  try {
+    await Promise.all(deleted.scheduleRows.map((r) => removeScheduleImage(r.filePath)));
+  } catch (e) {
+    console.error(e);
+    scheduleImageDeleteWarning = "schedule_image_file_delete_failed";
+  }
 
   return NextResponse.json({
     ok: true,
     month,
-    deletedApplicationRows: deletedApplications,
+    deletedApplicationRows: deleted.deletedApplications,
+    deletedScheduleImages: deleted.scheduleRows.length,
+    ...(scheduleImageDeleteWarning ? { warning: scheduleImageDeleteWarning } : {}),
   });
 }

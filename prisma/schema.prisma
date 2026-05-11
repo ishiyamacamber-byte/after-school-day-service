@@ -22,6 +22,7 @@ model User {
   managementNumber Int?     @map("management_number")
   role             UserRole @default(USER)
   applications     Application[]
+  uploadedScheduleImages FacilityMonthlyScheduleImage[] @relation("ScheduleImageUploader")
 
   @@index([managementNumber])
   @@map("users")
@@ -38,6 +39,7 @@ model Facility {
   /// 一覧・プルダウンでの表示順（昇順。同値のときは名前順）
   sortOrder     Int            @default(0) @map("sort_order")
   applications  Application[]
+  scheduleImages FacilityMonthlyScheduleImage[]
 
   @@map("facilities")
 }
@@ -84,4 +86,22 @@ model ApplicationAdminEditLog {
   @@index([targetUserId, month])
   @@index([editedAt])
   @@map("application_admin_edit_logs")
+}
+
+/// 事業所ごとの月別予定表画像（PNG）
+model FacilityMonthlyScheduleImage {
+  id           String   @id @default(cuid())
+  facilityId   String   @map("facility_id")
+  month        String
+  filePath     String   @map("file_path")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  uploadedById String   @map("uploaded_by_id")
+
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation("ScheduleImageUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, month])
+  @@index([month])
+  @@index([uploadedAt])
+  @@map("facility_monthly_schedule_images")
 }
