@@ -10,7 +10,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
-    "db:ensure-extra-admins": "tsx prisma/run-ensure-extra-admins.ts",
+    "db:ensure-extra-admins": "node prisma/ensure-extra-admins.cjs",
     "sample:import-xlsx": "tsx scripts/generate-sample-import-xlsx.ts",
     "db:studio": "prisma studio"
   },

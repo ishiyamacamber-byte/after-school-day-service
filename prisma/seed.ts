@@ -1,6 +1,12 @@
+import { createRequire } from "node:module";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { ensureExtraAdminUsers } from "./ensure-extra-admins-logic";
+import type { PrismaClient as PrismaClientType } from "@prisma/client";
+
+const require = createRequire(import.meta.url);
+const { ensureExtraAdminUsers } = require("./ensure-extra-admins.cjs") as {
+  ensureExtraAdminUsers: (prisma: PrismaClientType) => Promise<void>;
+};
 
 const prisma = new PrismaClient();
 

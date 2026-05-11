@@ -20,6 +20,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# 本番 entrypoint が参照する。リポジトリに無いまま build すると実行時だけ失敗するのを防ぐ
+RUN test -f prisma/ensure-extra-admins.cjs
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npx prisma generate
 RUN npm run build
