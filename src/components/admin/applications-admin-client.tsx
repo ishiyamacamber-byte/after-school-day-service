@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { formatDateTimeJapan } from "@/lib/datetime-japan";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -942,15 +943,7 @@ export function ApplicationsAdminClient({
                 <ul className="space-y-3">
                   {historyEntries.map((e) => (
                     <li key={e.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                      <p className="font-semibold text-slate-900">
-                        {new Date(e.editedAtIso).toLocaleString("ja-JP", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
+                      <p className="font-semibold text-slate-900">{formatDateTimeJapan(e.editedAtIso)}</p>
                       <p className="mt-1 text-xs text-slate-700">
                         {e.editorName}（{e.editorLoginId}）
                       </p>

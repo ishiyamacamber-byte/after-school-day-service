@@ -1,13 +1,11 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { format } from "date-fns";
 import { authOptions } from "@/lib/auth";
-import { formatDateTimeJapan } from "@/lib/datetime-japan";
+import { formatDateTimeJapan, formatDateYmdJapan } from "@/lib/datetime-japan";
 import { prisma } from "@/lib/prisma";
 import { ApplyPageClient } from "@/components/apply/apply-page-client";
 import { queryAdminEditLogsForTargetMonth } from "@/lib/application-admin-edit-log";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
-import { monthEndExclusive, monthStart, toMonthKey } from "@/lib/month";
 
 type SnapshotPayload = {
   days?: { date: string; facilityId: string; notes?: string }[];
@@ -74,7 +72,7 @@ export default async function ApplyPage() {
 
   if (!user) redirect("/login");
 
-  const openMonth = openMonthConfig?.value ?? toMonthKey(new Date());
+  const openMonth = openMonthConfig?.value ?? formatDateYmdJapan(new Date()).slice(0, 7);
   const dayApps = await prisma.application.findMany({
     where: { userId: user.id, date: { not: null } },
     orderBy: [{ date: "asc" }],
@@ -90,10 +88,10 @@ export default async function ApplyPage() {
 
   for (const a of dayApps) {
     if (!a.date) continue;
-    const mk = toMonthKey(a.date);
+    const mk = formatDateYmdJapan(a.date).slice(0, 7);
     monthsSet.add(mk);
     groupIds.add(a.groupId);
-    const key = format(a.date, "yyyy-MM-dd");
+    const key = formatDateYmdJapan(a.date);
     const s =
       summariesByMonth[mk] ??
       ({
@@ -120,7 +118,7 @@ export default async function ApplyPage() {
   for (const a of overallApps) {
     const anyDay = dayApps.find((d) => d.groupId === a.groupId && d.date);
     if (!anyDay?.date) continue;
-    const mk = toMonthKey(anyDay.date);
+    const mk = formatDateYmdJapan(anyDay.date).slice(0, 7);
     if (!summariesByMonth[mk]) continue;
     const nowOverall = summariesByMonth[mk]!.overallNotes;
     const note = a.notes?.trim();
@@ -131,7 +129,12 @@ export default async function ApplyPage() {
   const submittedMonths = [...monthsSet].sort();
   const hasOpenMonthSubmission = submittedMonths.includes(openMonth);
   const openMonthSummary = summariesByMonth[openMonth] ?? null;
-  const latestSubmittedAt = dayApps.length > 0 ? dayApps[dayApps.length - 1]!.submittedAt : null;
+  const latestAppRow = await prisma.application.findFirst({
+    where: { userId: user.id },
+    orderBy: { submittedAt: "desc" },
+    select: { submittedAt: true },
+  });
+  const latestSubmittedAt = latestAppRow?.submittedAt ?? null;
 
   const facilityNameById = new Map(
     (await prisma.facility.findMany({ orderBy: FACILITY_LIST_ORDER_BY, select: { id: true, name: true } })).map(

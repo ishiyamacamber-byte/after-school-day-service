@@ -1,5 +1,10 @@
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import {
+  formatMonthDayWeekdayJapanYmd,
+  formatWeekdayShortJapan,
+  formatYmdFromCalendarGrid,
+  getDayOfWeekSun0JapanYmd,
+  parseYmdAsTokyoNoon,
+} from "@/lib/datetime-japan";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -14,17 +19,17 @@ export function SubmittedCalendar({
   monthIndex: number;
   dayMap: Record<string, DayInfo>;
 }) {
-  const firstDow = new Date(year, monthIndex, 1).getDay();
+  const monthStartKey = formatYmdFromCalendarGrid(year, monthIndex, 1);
+  const firstDow = getDayOfWeekSun0JapanYmd(monthStartKey);
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
   const listItems = Object.entries(dayMap)
     .filter(([, v]) => v.facilityName)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, v]) => {
-      const d = new Date(`${key}T12:00:00`);
       return {
         key,
-        label: format(d, "M月d日（E）", { locale: ja }),
+        label: formatMonthDayWeekdayJapanYmd(key),
         facility: v.facilityName,
         hasNotes: !!v.notes?.trim(),
       };
@@ -39,11 +44,10 @@ export function SubmittedCalendar({
 
   const cells = Array.from({ length: daysInMonth }, (_, i) => {
     const day = i + 1;
-    const d = new Date(year, monthIndex, day);
-    const key = format(d, "yyyy-MM-dd");
+    const key = formatYmdFromCalendarGrid(year, monthIndex, day);
     const info = dayMap[key];
     const has = !!info?.facilityName;
-    const dow = d.getDay();
+    const dow = getDayOfWeekSun0JapanYmd(key);
     const isSun = dow === 0;
     const isSat = dow === 6;
 
@@ -69,7 +73,7 @@ export function SubmittedCalendar({
               isSun ? "text-red-500" : isSat ? "text-blue-600" : "text-slate-500"
             }`}
           >
-            {format(d, "E", { locale: ja })}
+            {formatWeekdayShortJapan(parseYmdAsTokyoNoon(key))}
           </span>
         </div>
         {has ? (

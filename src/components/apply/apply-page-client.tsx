@@ -2,9 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ja } from "date-fns/locale";
-import { format } from "date-fns";
-import { formatDateTimeJapan } from "@/lib/datetime-japan";
+import {
+  formatDateTimeJapan,
+  formatDateYmdJapan,
+  formatMonthDayWeekdayJapanYmd,
+  formatWeekdayShortJapan,
+  formatYmdFromCalendarGrid,
+  getDayOfWeekSun0JapanYmd,
+  parseYmdAsTokyoNoon,
+} from "@/lib/datetime-japan";
 import { getDefaultFacilityIdForDate } from "@/lib/default-schedule";
 import { SubmittedCalendar } from "@/components/apply/submitted-calendar";
 
@@ -43,7 +49,7 @@ type DayEntry = {
 };
 
 function dateKey(d: Date) {
-  return format(d, "yyyy-MM-dd");
+  return formatDateYmdJapan(d);
 }
 
 const WEEKDAY_SHORT = ["日", "月", "火", "水", "木", "金", "土"] as const;
@@ -143,12 +149,10 @@ export function ApplyPageClient({
 
   function datesInOpenMonthForWeekday(weekday: number): Date[] {
     const out: Date[] = [];
-    const y = openMonthDate.getFullYear();
-    const m = openMonthDate.getMonth();
     const lastDay = openMonthEnd.getDate();
     for (let day = 1; day <= lastDay; day++) {
-      const d = new Date(y, m, day);
-      if (d.getDay() === weekday) out.push(d);
+      const key = formatYmdFromCalendarGrid(oy, om - 1, day);
+      if (getDayOfWeekSun0JapanYmd(key) === weekday) out.push(parseYmdAsTokyoNoon(key));
     }
     return out;
   }
@@ -208,7 +212,7 @@ export function ApplyPageClient({
   }
 
   const sortedSelected = [...selected].sort((a, b) => a.getTime() - b.getTime());
-  const firstDow = new Date(oy, om - 1, 1).getDay();
+  const firstDow = getDayOfWeekSun0JapanYmd(formatYmdFromCalendarGrid(oy, om - 1, 1));
   const daysInMonth = openMonthEnd.getDate();
 
   function facilityLabelForDate(d: Date): string {
@@ -300,7 +304,7 @@ export function ApplyPageClient({
                             className="rounded-lg border border-slate-200 bg-white p-3 text-base leading-relaxed text-slate-900 shadow-sm"
                           >
                             <span className="block text-sm font-bold text-slate-700">
-                              {format(new Date(`${key}T12:00:00`), "M月d日（E）", { locale: ja })}
+                              {formatMonthDayWeekdayJapanYmd(key)}
                             </span>
                             <span className="mt-1 block whitespace-pre-wrap">{v.notes}</span>
                           </li>
@@ -350,7 +354,7 @@ export function ApplyPageClient({
                                 className="rounded-md border border-slate-100 bg-white px-2 py-1.5 text-xs leading-snug"
                               >
                                 <span className="font-semibold text-slate-800">
-                                  {format(new Date(`${d.date}T12:00:00`), "M月d日（E）", { locale: ja })}
+                                  {formatMonthDayWeekdayJapanYmd(d.date)}
                                 </span>
                                 <span className="text-slate-600"> · {d.facilityName}</span>
                                 {d.notes.trim() ? (
@@ -428,8 +432,8 @@ export function ApplyPageClient({
                 ))}
                 {Array.from({ length: daysInMonth }, (_, i) => {
                   const day = i + 1;
-                  const d = new Date(oy, om - 1, day);
-                  const key = dateKey(d);
+                  const key = formatYmdFromCalendarGrid(oy, om - 1, day);
+                  const d = parseYmdAsTokyoNoon(key);
                   const isSelected = selected.some((x) => dateKey(x) === key);
                   const label = facilityLabelForDate(d);
                   return (
@@ -452,7 +456,7 @@ export function ApplyPageClient({
                           {day}
                         </span>
                         <span className="text-[11px] text-slate-500 sm:text-xs">
-                          {format(d, "E", { locale: ja })}
+                          {formatWeekdayShortJapan(d)}
                         </span>
                       </div>
                       <p
@@ -497,7 +501,9 @@ export function ApplyPageClient({
               const e = byDate[key] ?? ensureEntry(d);
               return (
                 <div key={key} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                  <div className="font-semibold text-slate-900">{format(d, "M月d日（E）", { locale: ja })}</div>
+                  <div className="font-semibold text-slate-900">
+                    {formatMonthDayWeekdayJapanYmd(dateKey(d))}
+                  </div>
                   <label className="mt-3 flex flex-col gap-2 text-sm font-medium text-slate-700">
                     利用事業所
                     <select
