@@ -25,6 +25,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           >
             予定表
           </Link>
+          <Link
+            href="/communication"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 active:bg-slate-50"
+          >
+            通信
+          </Link>
           {session.user.role === "ADMIN" && (
             <>
               <Link
@@ -56,6 +62,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 active:bg-slate-50"
               >
                 予定表管理
+              </Link>
+              <Link
+                href="/admin/newsletters"
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 active:bg-slate-50"
+              >
+                通信管理
               </Link>
             </>
           )}

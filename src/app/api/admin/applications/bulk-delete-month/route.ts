@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { deleteApplicationsForCalendarMonth, whereApplicationsForCalendarMonth } from "@/lib/application-calendar-month";
 import { prisma } from "@/lib/prisma";
 import { removeScheduleImage } from "@/lib/schedule-image-storage";
+import { removeNewsletterImage } from "@/lib/newsletter-image-storage";
 import { Prisma } from "@prisma/client";
 
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
 
   const whereApp = await whereApplicationsForCalendarMonth(prisma, month);
 
-  const [applicationRowCount, byUser, logAgg, scheduleImageCount] = await Promise.all([
+  const [applicationRowCount, byUser, logAgg, scheduleImageCount, newsletterImageCount] = await Promise.all([
     prisma.application.count({ where: whereApp }),
     prisma.application.groupBy({
       by: ["userId"],
@@ -40,6 +41,7 @@ export async function GET(req: Request) {
       SELECT COUNT(*) AS n FROM "application_admin_edit_logs" WHERE "month" = ${month}
     `),
     prisma.facilityMonthlyScheduleImage.count({ where: { month } }),
+    prisma.facilityMonthlyNewsletterImage.count({ where: { month } }),
   ]);
 
   const editLogCount = Number(logAgg[0]?.n ?? 0);
@@ -50,6 +52,7 @@ export async function GET(req: Request) {
     userCount: byUser.length,
     editLogCount,
     scheduleImageCount,
+    newsletterImageCount,
   });
 }
 
@@ -70,12 +73,17 @@ export async function POST(req: Request) {
       where: { month },
       select: { filePath: true },
     });
+    const newsletterRows = await tx.facilityMonthlyNewsletterImage.findMany({
+      where: { month },
+      select: { filePath: true },
+    });
     const r = await deleteApplicationsForCalendarMonth(tx, month);
     await tx.$executeRaw(Prisma.sql`
       DELETE FROM "application_admin_edit_logs" WHERE "month" = ${month}
     `);
     await tx.facilityMonthlyScheduleImage.deleteMany({ where: { month } });
-    return { deletedApplications: r.count, scheduleRows };
+    await tx.facilityMonthlyNewsletterImage.deleteMany({ where: { month } });
+    return { deletedApplications: r.count, scheduleRows, newsletterRows };
   });
 
   let scheduleImageDeleteWarning: string | undefined;
@@ -86,11 +94,21 @@ export async function POST(req: Request) {
     scheduleImageDeleteWarning = "schedule_image_file_delete_failed";
   }
 
+  let newsletterImageDeleteWarning: string | undefined;
+  try {
+    await Promise.all(deleted.newsletterRows.map((r) => removeNewsletterImage(r.filePath)));
+  } catch (e) {
+    console.error(e);
+    newsletterImageDeleteWarning = "newsletter_image_file_delete_failed";
+  }
+
   return NextResponse.json({
     ok: true,
     month,
     deletedApplicationRows: deleted.deletedApplications,
     deletedScheduleImages: deleted.scheduleRows.length,
+    deletedNewsletterImages: deleted.newsletterRows.length,
     ...(scheduleImageDeleteWarning ? { warning: scheduleImageDeleteWarning } : {}),
+    ...(newsletterImageDeleteWarning ? { newsletterWarning: newsletterImageDeleteWarning } : {}),
   });
 }

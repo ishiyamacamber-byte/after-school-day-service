@@ -23,6 +23,7 @@ model User {
   role             UserRole @default(USER)
   applications     Application[]
   uploadedScheduleImages FacilityMonthlyScheduleImage[] @relation("ScheduleImageUploader")
+  uploadedNewsletterImages FacilityMonthlyNewsletterImage[] @relation("NewsletterImageUploader")
 
   @@index([managementNumber])
   @@map("users")
@@ -40,6 +41,7 @@ model Facility {
   sortOrder     Int            @default(0) @map("sort_order")
   applications  Application[]
   scheduleImages FacilityMonthlyScheduleImage[]
+  newsletterImages FacilityMonthlyNewsletterImage[]
 
   @@map("facilities")
 }
@@ -104,4 +106,22 @@ model FacilityMonthlyScheduleImage {
   @@index([month])
   @@index([uploadedAt])
   @@map("facility_monthly_schedule_images")
+}
+
+/// 事業所ごとの月別通信（ニュースレター）画像（PNG）
+model FacilityMonthlyNewsletterImage {
+  id           String   @id @default(cuid())
+  facilityId   String   @map("facility_id")
+  month        String
+  filePath     String   @map("file_path")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  uploadedById String   @map("uploaded_by_id")
+
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation("NewsletterImageUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, month])
+  @@index([month])
+  @@index([uploadedAt])
+  @@map("facility_monthly_newsletter_images")
 }

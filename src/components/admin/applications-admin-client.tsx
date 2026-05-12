@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatDateTimeJapan } from "@/lib/datetime-japan";
 
@@ -11,6 +11,12 @@ function formatMonthKeyToJapaneseLabel(yyyyMm: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(yyyyMm.trim());
   if (!m) return yyyyMm;
   return `${Number(m[1])}年${Number(m[2])}月`;
+}
+
+function shiftMonth(yyyyMm: string, delta: number): string {
+  const [y, m] = yyyyMm.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 type Row = {
@@ -70,6 +76,8 @@ export function ApplicationsAdminClient({
   facilities: FacilityOpt[];
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [year, monthIndex] = month.split("-").map(Number);
   const firstDow = new Date(year, monthIndex - 1, 1).getDay();
   const daysInMonth = new Date(year, monthIndex, 0).getDate();
@@ -83,6 +91,7 @@ export function ApplicationsAdminClient({
   const [editOverallNotes, setEditOverallNotes] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [message, setMessage] = useState("");
+  const [monthInputValue, setMonthInputValue] = useState(month);
 
   const [historyTarget, setHistoryTarget] = useState<{ userId: string; userName: string } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -105,12 +114,24 @@ export function ApplicationsAdminClient({
   } | null>(null);
 
   useEffect(() => {
+    setMonthInputValue(month);
+  }, [month]);
+
+  useEffect(() => {
     const lock = !!(editTarget || historyTarget);
     document.body.style.overflow = lock ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
   }, [editTarget, historyTarget]);
+
+  function applyMonthNavigation(nextMonth: string) {
+    if (!/^\d{4}-\d{2}$/.test(nextMonth)) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", nextMonth);
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -134,6 +155,16 @@ export function ApplicationsAdminClient({
   }, [editTarget, historyTarget, savingEdit]);
 
   async function updateOpenMonth() {
+    const newLabel = formatMonthKeyToJapaneseLabel(selectedOpenMonth);
+    const currentLabel = formatMonthKeyToJapaneseLabel(openMonth);
+    const ok = confirm(
+      "【申請受付月の変更】\n\n" +
+        `利用者が申請できる月を「${currentLabel}（${openMonth}）」から「${newLabel}（${selectedOpenMonth}）」に変更します。\n\n` +
+        "※ 下の「表示する月」は一覧の閲覧月だけを変えます。ここはシステム全体の受付月です。\n\n" +
+        "よろしいですか？"
+    );
+    if (!ok) return;
+
     setBusyMonth(true);
     setMessage("");
     const res = await fetch("/api/admin/open-month", {
@@ -385,7 +416,7 @@ export function ApplicationsAdminClient({
           <h1 className="text-lg font-bold text-slate-900">申請一覧</h1>
           <p className="mt-1 text-sm text-slate-700">
             表示中の対象月:{" "}
-            <span className="font-semibold text-slate-900">{monthLabelJa}</span>
+            <span className="text-lg font-bold text-slate-900">{monthLabelJa}</span>
             <span className="text-slate-500">（{month}）</span>
           </p>
         </div>
@@ -401,6 +432,9 @@ export function ApplicationsAdminClient({
         <p className="text-sm font-semibold text-slate-900">申請受付月の管理</p>
         <p className="mt-1 text-xs text-slate-600">
           利用者はこの月のみ申請できます。申請後の内容調整は管理者がこの画面で対応します。
+          <span className="mt-1 block text-amber-800/90">
+            下の「表示する月」とは別です（こちらは受付設定、下は一覧の閲覧月）。
+          </span>
         </p>
         <div className="mt-3 flex items-center gap-2">
           <input
@@ -476,14 +510,40 @@ export function ApplicationsAdminClient({
         <div className="grid grid-cols-1 gap-3">
           <label className="text-sm font-medium text-slate-700">
             表示する月
-            <input
-              type="month"
-              name="month"
-              defaultValue={month}
-              className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
-            />
+            <div className="mt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => applyMonthNavigation(shiftMonth(month, -1))}
+                className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 active:bg-slate-50"
+                aria-label="前の月へ移動"
+              >
+                前月
+              </button>
+              <input
+                type="month"
+                name="month"
+                value={monthInputValue}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setMonthInputValue(next);
+                  applyMonthNavigation(next);
+                }}
+                className="min-h-11 w-full rounded-xl border border-slate-300 px-3 text-lg font-semibold text-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => applyMonthNavigation(shiftMonth(month, 1))}
+                className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 active:bg-slate-50"
+                aria-label="次の月へ移動"
+              >
+                翌月
+              </button>
+            </div>
             <span className="mt-1 block text-xs font-normal text-slate-500">
-              現在の一覧: <strong className="text-slate-700">{monthLabelJa}</strong> の申請データです。
+              現在の一覧: <strong className="text-base text-slate-800">{monthLabelJa}</strong> の申請データです。
+            </span>
+            <span className="mt-0.5 block text-xs font-normal text-slate-500">
+              月を変更すると一覧はすぐ切り替わります（下の適用ボタンは他条件用）。
             </span>
           </label>
           <label className="text-sm font-medium text-slate-700">
