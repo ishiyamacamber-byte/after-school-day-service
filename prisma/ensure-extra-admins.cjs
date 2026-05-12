@@ -38,6 +38,10 @@ async function ensureExtraAdminUsers(prisma) {
 }
 
 async function main() {
+  if (process.env.SKIP_ENSURE_EXTRA_ADMINS === "1") {
+    console.log("[ensure-extra-admins] skipped (SKIP_ENSURE_EXTRA_ADMINS=1)");
+    return;
+  }
   const prisma = new PrismaClient();
   try {
     await ensureExtraAdminUsers(prisma);

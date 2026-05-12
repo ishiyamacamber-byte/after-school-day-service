@@ -13,6 +13,8 @@ services:
       DATABASE_URL: file:/app/data/prod.db
       # 表示用の日時を日本時間に合わせる
       TZ: Asia/Tokyo
+      # デモ用 admin100〜admin105 の自動 upsert を止める: "1"（.env.production に書いてもよい）
+      # SKIP_ENSURE_EXTRA_ADMINS: "1"
     volumes:
       - sqlite-data:/app/data
     restart: unless-stopped

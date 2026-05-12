@@ -106,7 +106,7 @@ export function UserSettingsForm({
         setMsg("入力内容が不正です。パスワードは4文字以上、または空欄にしてください。");
         return;
       }
-      setMsg("保存に失敗しました。");
+      setMsg(`保存に失敗しました。${j.error ? ` (${j.error})` : ""}`);
       return;
     }
     setMsg("保存しました。");
@@ -115,10 +115,6 @@ export function UserSettingsForm({
   }
 
   async function onDelete() {
-    if (user.role === "ADMIN") {
-      setMsg("ADMINユーザーは削除できません。");
-      return;
-    }
     if (!confirm(`${name.trim() || user.name}（${loginId}）を削除します。よろしいですか？`)) return;
     setDeleting(true);
     setMsg(null);
@@ -126,8 +122,8 @@ export function UserSettingsForm({
     const j = (await res.json().catch(() => ({}))) as { error?: string };
     setDeleting(false);
     if (!res.ok) {
-      if (j.error === "cannot_delete_admin") {
-        setMsg("ADMINユーザーは削除できません。");
+      if (j.error === "cannot_delete_last_admin") {
+        setMsg("管理者は最低1人必要です。他に管理者を作成してから削除してください。");
         return;
       }
       setMsg("削除に失敗しました。");
@@ -263,7 +259,7 @@ export function UserSettingsForm({
         </button>
         <button
           type="button"
-          disabled={saving || deleting || user.role === "ADMIN"}
+          disabled={saving || deleting}
           onClick={onDelete}
           className="min-h-14 rounded-xl bg-rose-600 px-6 text-base font-semibold text-white disabled:opacity-50"
         >

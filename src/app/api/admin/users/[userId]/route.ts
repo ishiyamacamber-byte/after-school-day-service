@@ -69,13 +69,16 @@ export async function PATCH(
     if (!Array.isArray(ids) || ids.some((v) => typeof v !== "string")) {
       return NextResponse.json({ error: "invalid_allowed_facility_ids_shape" }, { status: 400 });
     }
-    const count = await prisma.facility.count({
-      where: { id: { in: ids as string[] } },
+    // 旧データに存在しない事業所IDが混ざると、パスワード再設定だけでも保存できなくなる。
+    // 既知IDだけに正規化して保存する。
+    const rawIds = ids as string[];
+    const existingFacilities = await prisma.facility.findMany({
+      where: { id: { in: rawIds } },
+      select: { id: true },
     });
-    if (count !== (ids as string[]).length) {
-      return NextResponse.json({ error: "unknown_facility_id_in_allowed_facility_ids" }, { status: 400 });
-    }
-    data.allowedFacilityIds = parsed.data.allowedFacilityIds;
+    const known = new Set(existingFacilities.map((f) => f.id));
+    const normalized = [...new Set(rawIds.filter((id) => known.has(id)))];
+    data.allowedFacilityIds = JSON.stringify(normalized);
   }
   if (parsed.data.loginId !== undefined) {
     const conflict = await prisma.user.findUnique({
@@ -139,7 +142,10 @@ export async function DELETE(
     return NextResponse.json({ error: "user_not_found" }, { status: 404 });
   }
   if (target.role === "ADMIN") {
-    return NextResponse.json({ error: "cannot_delete_admin" }, { status: 400 });
+    const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+    if (adminCount <= 1) {
+      return NextResponse.json({ error: "cannot_delete_last_admin" }, { status: 400 });
+    }
   }
 
   await prisma.$transaction(async (tx) => {
