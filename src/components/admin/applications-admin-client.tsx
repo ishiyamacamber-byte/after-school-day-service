@@ -67,8 +67,8 @@ export function ApplicationsAdminClient({
   userId: string;
   q: string;
   sortFacility: string;
-  /** submitted | management（サーバー側ソート用クエリの反映） */
-  listSort: "submitted" | "management";
+  /** submitted | submitted_desc | management（サーバー側ソート用クエリの反映） */
+  listSort: "submitted" | "submitted_desc" | "management";
   unsubmittedFirst: boolean;
   openMonth: string;
   rows: Row[];
@@ -601,6 +601,7 @@ export function ApplicationsAdminClient({
               className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
             >
               <option value="submitted">申請順（申請日時が早い順）</option>
+              <option value="submitted_desc">申請順（申請日時が遅い順）</option>
               <option value="management">管理番号順（番号なしは末尾）</option>
             </select>
           </label>
@@ -617,7 +618,7 @@ export function ApplicationsAdminClient({
         </div>
         <p className="mt-2 text-xs text-slate-500">
           事業所を選ぶと、その事業所が<strong>利用可能に設定されている</strong>利用者が上に並びます（申請の利用日数とは無関係）。
-          「並び順の基準」はそのあとの並べ替えです（利用可能事業所の順・未申請を先頭はいずれより優先）。申請順は同一月の<strong>提出が早い順</strong>です。
+          「並び順の基準」はそのあとの並べ替えです（利用可能事業所の順・未申請を先頭はいずれより優先）。申請順は同一月の<strong>提出日時</strong>で並べます（早い順／遅い順）。
         </p>
         <button
           type="submit"

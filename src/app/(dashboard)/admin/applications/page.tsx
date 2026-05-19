@@ -45,7 +45,7 @@ export default async function AdminApplicationsPage({
     userId?: string;
     q?: string;
     sortFacility?: string;
-    /** submitted=申請日時順（早い申請が上） / management=管理番号順 */
+    /** submitted=申請日時順（早い） / submitted_desc=申請日時順（遅い） / management=管理番号順 */
     listSort?: string;
     unsubmittedFirst?: string;
   }>;
@@ -59,7 +59,12 @@ export default async function AdminApplicationsPage({
   const q = (sp.q ?? "").trim();
   /** 事業所 ID（利用者設定の allowedFacilityIds と突き合わせる） */
   const sortFacility = (sp.sortFacility ?? "").trim();
-  const listSort = sp.listSort === "management" ? "management" : "submitted";
+  const listSort =
+    sp.listSort === "management"
+      ? "management"
+      : sp.listSort === "submitted_desc"
+        ? "submitted_desc"
+        : "submitted";
   const unsubmittedFirst = sp.unsubmittedFirst === "1";
 
   const [users, datedRows, openMonthConfig, facilities] = await Promise.all([
@@ -240,7 +245,10 @@ export default async function AdminApplicationsPage({
       return a.loginId.localeCompare(b.loginId);
     }
     if (a.hasSubmission && b.hasSubmission) {
-      const c = a.submittedAt.getTime() - b.submittedAt.getTime();
+      const c =
+        listSort === "submitted_desc"
+          ? b.submittedAt.getTime() - a.submittedAt.getTime()
+          : a.submittedAt.getTime() - b.submittedAt.getTime();
       if (c !== 0) return c;
       return a.loginId.localeCompare(b.loginId);
     }
