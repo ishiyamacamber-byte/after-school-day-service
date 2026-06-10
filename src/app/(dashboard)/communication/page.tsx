@@ -20,9 +20,8 @@ export default async function CommunicationPage({
   if (!session?.user?.id) redirect("/login");
 
   const sp = await searchParams;
-  const openMonthConfig = await prisma.systemConfig.findUnique({ where: { key: "open_month" } });
-  const fallbackMonth = openMonthConfig?.value ?? formatDateYmdJapan(new Date()).slice(0, 7);
-  const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : fallbackMonth;
+  const currentMonth = formatDateYmdJapan(new Date()).slice(0, 7);
+  const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : currentMonth;
 
   const [facilities, rows] = await Promise.all([
     prisma.facility.findMany({

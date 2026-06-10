@@ -54,6 +54,11 @@ function dateKey(d: Date) {
 
 const WEEKDAY_SHORT = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
+function monthLabelJa(yyyyMm: string): string {
+  const [y, m] = yyyyMm.split("-").map(Number);
+  return `${y}年${m}月`;
+}
+
 export function ApplyPageClient({
   user,
   facilities,
@@ -68,20 +73,31 @@ export function ApplyPageClient({
   const openMonthEnd = new Date(oy, om, 0);
   const [submittedAtText, setSubmittedAtText] = useState<string | null>(user.submittedAtText);
   const [submittedNow, setSubmittedNow] = useState(user.alreadySubmitted);
-  const [viewMonth, setViewMonth] = useState(
-    user.submittedMonths.includes(user.openMonth)
-      ? user.openMonth
-      : user.submittedMonths[user.submittedMonths.length - 1] ?? user.openMonth
-  );
+  const [activeMonth, setActiveMonth] = useState(user.openMonth);
   const hasSubmittedOpenMonth = submittedNow;
-  const hasRegisteredMonths = user.submittedMonths.length > 0;
-  const displaySummary = user.summariesByMonth[viewMonth] ?? null;
-  const adminEditHistory = user.adminEditHistoryByMonth[viewMonth] ?? [];
+
+  const selectableMonths = useMemo(() => {
+    const months = [...user.submittedMonths];
+    if (!hasSubmittedOpenMonth && !months.includes(user.openMonth)) {
+      months.push(user.openMonth);
+    }
+    return months.sort();
+  }, [user.submittedMonths, user.openMonth, hasSubmittedOpenMonth]);
+
+  const isViewingOpenMonth = activeMonth === user.openMonth;
+  const showRegisteredView = user.summariesByMonth[activeMonth] != null;
+  const showApplyForm = isViewingOpenMonth && !hasSubmittedOpenMonth;
+  const displaySummary = user.summariesByMonth[activeMonth] ?? null;
+  const adminEditHistory = user.adminEditHistoryByMonth[activeMonth] ?? [];
 
   useEffect(() => {
     setSubmittedAtText(user.submittedAtText);
     setSubmittedNow(user.alreadySubmitted);
   }, [user.submittedAtText, user.alreadySubmitted]);
+
+  useEffect(() => {
+    setActiveMonth(user.openMonth);
+  }, [user.openMonth]);
 
   const hasFacilities = facilities.length > 0;
   const [month] = useState(() => openMonthDate);
@@ -236,7 +252,39 @@ export function ApplyPageClient({
         </p>
       </div>
 
-      {hasSubmittedOpenMonth ? (
+      {selectableMonths.length > 1 ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <label className="text-sm font-medium text-slate-700">
+            表示する月
+            <select
+              value={activeMonth}
+              onChange={(e) => setActiveMonth(e.target.value)}
+              className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base font-semibold text-slate-900"
+            >
+              {selectableMonths.map((m) => {
+                const isOpen = m === user.openMonth;
+                const isSubmitted = user.submittedMonths.includes(m);
+                let suffix = "";
+                if (isOpen && !isSubmitted) suffix = "（申請する月）";
+                else if (isOpen && isSubmitted) suffix = "（申請済み）";
+                else if (isSubmitted) suffix = "（登録済み）";
+                return (
+                  <option key={m} value={m}>
+                    {monthLabelJa(m)}（{m}）{suffix}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <p className="mt-2 text-xs text-slate-600">
+            {showApplyForm
+              ? `${monthLabelJa(activeMonth)}の利用予定を申請できます。`
+              : `${monthLabelJa(activeMonth)}に登録されている利用予定を表示しています。`}
+          </p>
+        </div>
+      ) : null}
+
+      {hasSubmittedOpenMonth && isViewingOpenMonth ? (
         <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
           <p className="font-semibold">{user.openMonth} の申請は完了しています。</p>
           <p className="mt-1">最終更新（登録反映）: {submittedAtText ?? "不明"}</p>
@@ -246,40 +294,20 @@ export function ApplyPageClient({
         </div>
       ) : null}
 
-      {hasRegisteredMonths && displaySummary ? (
+      {showRegisteredView && displaySummary ? (
         <div className="flex flex-col gap-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">登録済みの利用予定</h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              {monthLabelJa(activeMonth)}の登録済み利用予定
+            </h2>
             <p className="mt-1 text-xs text-slate-600">
-              過去月の内容もここで確認できます。表示月を切り替えてください。
+              ご自身が送信した申請に加え、管理者が調整した結果が含まれます。
             </p>
           </div>
 
-          {user.submittedMonths.length > 1 ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <label className="text-sm font-medium text-slate-700">
-                表示月
-                <select
-                  value={viewMonth}
-                  onChange={(e) => setViewMonth(e.target.value)}
-                  className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
-                >
-                  {user.submittedMonths.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                      {m === user.openMonth ? "（申請受付月）" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-600">表示中: {viewMonth}</p>
-          )}
-
           <SubmittedCalendar
-            year={Number(viewMonth.split("-")[0])}
-            monthIndex={Number(viewMonth.split("-")[1]) - 1}
+            year={Number(activeMonth.split("-")[0])}
+            monthIndex={Number(activeMonth.split("-")[1]) - 1}
             dayMap={Object.fromEntries(
               Object.entries(displaySummary.days).map(([k, v]) => [
                 k,
@@ -379,7 +407,7 @@ export function ApplyPageClient({
         </div>
       ) : null}
 
-      {!hasSubmittedOpenMonth && overLimit && (
+      {showApplyForm && overLimit && (
         <div
           className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="status"
@@ -389,21 +417,21 @@ export function ApplyPageClient({
         </div>
       )}
 
-      {!hasSubmittedOpenMonth && !hasFacilities && (
+      {showApplyForm && !hasFacilities && (
         <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
           利用可能な事業所が設定されていないため申請できません。管理者が利用者設定を確認してください。
         </div>
       )}
-      {!hasSubmittedOpenMonth && (
+      {showApplyForm && (
         <>
-          {!hasRegisteredMonths ? null : (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-              <p className="font-semibold">{user.openMonth} の申請</p>
-              <p className="mt-1 text-xs leading-relaxed">
-                申請受付月が切り替わりました。下のカレンダーから {user.openMonth} の利用予定を選択して送信してください。
-              </p>
-            </div>
-          )}
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              {monthLabelJa(user.openMonth)}の利用予定を申請
+            </h2>
+            <p className="mt-1 text-xs text-slate-600">
+              カレンダーで日付を選び、内容を入力して送信してください。
+            </p>
+          </div>
           <div className="apply-calendar overflow-x-auto rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
             <div className="mb-3">
               <p className="text-xs font-medium text-slate-600">曜日を一括選択</p>
@@ -553,7 +581,7 @@ export function ApplyPageClient({
         </p>
       )}
 
-      {!hasSubmittedOpenMonth && (
+      {showApplyForm && (
         <button
           type="button"
           disabled={submitting || selected.length === 0 || !hasFacilities}
