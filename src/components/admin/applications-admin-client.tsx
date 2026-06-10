@@ -574,7 +574,7 @@ export function ApplicationsAdminClient({
             />
             <datalist id="admin-user-search-hints">
               {users.map((u) => (
-                <option key={u.id} value={`${u.name} (${u.loginId})`} />
+                <option key={u.id} value={u.name} />
               ))}
             </datalist>
           </label>

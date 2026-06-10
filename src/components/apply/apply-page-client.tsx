@@ -40,7 +40,7 @@ type UserPayload = {
   submissionSummary: SubmissionSummary | null;
   summariesByMonth: Record<string, SubmissionSummary>;
   submittedMonths: string[];
-  adminEditHistory: UserAdminEditHistoryItem[];
+  adminEditHistoryByMonth: Record<string, UserAdminEditHistoryItem[]>;
 };
 
 type DayEntry = {
@@ -73,8 +73,10 @@ export function ApplyPageClient({
       ? user.openMonth
       : user.submittedMonths[user.submittedMonths.length - 1] ?? user.openMonth
   );
-  const hasSubmitted = submittedNow;
+  const hasSubmittedOpenMonth = submittedNow;
+  const hasRegisteredMonths = user.submittedMonths.length > 0;
   const displaySummary = user.summariesByMonth[viewMonth] ?? null;
+  const adminEditHistory = user.adminEditHistoryByMonth[viewMonth] ?? [];
 
   useEffect(() => {
     setSubmittedAtText(user.submittedAtText);
@@ -234,147 +236,150 @@ export function ApplyPageClient({
         </p>
       </div>
 
-      {hasSubmitted ? (
-        <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
-            <p className="font-semibold">この月の申請は完了しています。</p>
-            <p className="mt-1">最終更新（登録反映）: {submittedAtText ?? "不明"}</p>
-            <p className="mt-2 text-xs leading-relaxed">
-              下記は<strong>いまシステムに登録されている内容</strong>です。管理者が修正した場合も、ここに反映された状態で表示されます。内容の変更は管理者にご相談ください。
-            </p>
-          </div>
-
-          {displaySummary && (
-            <>
-              {user.submittedMonths.length > 1 && (
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <label className="text-sm font-medium text-slate-700">
-                    表示月
-                    <select
-                      value={viewMonth}
-                      onChange={(e) => setViewMonth(e.target.value)}
-                      className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
-                    >
-                      {user.submittedMonths.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">いま登録されている利用予定</h2>
-                <p className="mt-1 text-xs text-slate-600">
-                  ご自身が送信した申請に加え、管理者が調整した結果が含まれます。
-                </p>
-              </div>
-              <SubmittedCalendar
-                year={Number(viewMonth.split("-")[0])}
-                monthIndex={Number(viewMonth.split("-")[1]) - 1}
-                dayMap={Object.fromEntries(
-                  Object.entries(displaySummary.days).map(([k, v]) => [
-                    k,
-                    { facilityName: v.facilityName, notes: v.notes },
-                  ])
-                )}
-              />
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100 sm:p-5">
-                <h3 className="text-base font-bold text-slate-900">連絡事項（登録内容）</h3>
-                <div className="mt-4 space-y-4">
-                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                    <p className="text-xs font-bold text-slate-600">全体</p>
-                    <p className="mt-2 min-h-[1.25rem] whitespace-pre-wrap text-base leading-relaxed text-slate-900">
-                      {displaySummary.overallNotes?.trim() ? displaySummary.overallNotes : (
-                        <span className="text-slate-400">なし</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                    <p className="text-xs font-bold text-slate-600">日ごと</p>
-                    <ul className="mt-2 space-y-3">
-                      {Object.entries(displaySummary.days)
-                        .filter(([, v]) => v.notes?.trim())
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([key, v]) => (
-                          <li
-                            key={key}
-                            className="rounded-lg border border-slate-200 bg-white p-3 text-base leading-relaxed text-slate-900 shadow-sm"
-                          >
-                            <span className="block text-sm font-bold text-slate-700">
-                              {formatMonthDayWeekdayJapanYmd(key)}
-                            </span>
-                            <span className="mt-1 block whitespace-pre-wrap">{v.notes}</span>
-                          </li>
-                        ))}
-                    </ul>
-                    {!Object.values(displaySummary.days).some((v) => v.notes?.trim()) && (
-                      <p className="mt-2 text-base text-slate-400">なし</p>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 shadow-sm ring-1 ring-indigo-100 sm:p-5">
-                <h3 className="text-base font-bold text-slate-900">管理者による変更履歴</h3>
-                <p className="mt-1 text-xs text-slate-600">
-                  管理者が申請内容を修正・保存したときの記録です。各回の内容は、その時点で保存されたスナップショットです。
-                </p>
-                {user.adminEditHistory.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-700">
-                    まだ管理者による変更はありません（ご自身の申請の直後、または管理者が未対応の場合）。
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-3">
-                    {user.adminEditHistory.map((h, idx) => (
-                      <li
-                        key={h.id}
-                        className="rounded-xl border border-indigo-100 bg-white p-3 text-sm text-slate-800 shadow-sm"
-                      >
-                        <p className="font-semibold text-slate-900">
-                          {idx + 1}回目 · {h.editedAtText}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-600">
-                          対応者: {h.editorName}（{h.editorLoginId}）
-                        </p>
-                        <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs">
-                          <p className="font-bold text-slate-600">全体連絡事項</p>
-                          <p className="mt-1 whitespace-pre-wrap text-slate-800">
-                            {h.overallNotes?.trim() ? h.overallNotes : "なし"}
-                          </p>
-                        </div>
-                        <div className="mt-2">
-                          <p className="text-xs font-bold text-slate-600">日別</p>
-                          <ul className="mt-1 space-y-1.5">
-                            {h.dayRows.map((d) => (
-                              <li
-                                key={`${h.id}-${d.date}`}
-                                className="rounded-md border border-slate-100 bg-white px-2 py-1.5 text-xs leading-snug"
-                              >
-                                <span className="font-semibold text-slate-800">
-                                  {formatMonthDayWeekdayJapanYmd(d.date)}
-                                </span>
-                                <span className="text-slate-600"> · {d.facilityName}</span>
-                                {d.notes.trim() ? (
-                                  <p className="mt-0.5 whitespace-pre-wrap text-slate-700">{d.notes}</p>
-                                ) : null}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </>
-          )}
+      {hasSubmittedOpenMonth ? (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+          <p className="font-semibold">{user.openMonth} の申請は完了しています。</p>
+          <p className="mt-1">最終更新（登録反映）: {submittedAtText ?? "不明"}</p>
+          <p className="mt-2 text-xs leading-relaxed">
+            下記は<strong>いまシステムに登録されている内容</strong>です。管理者が修正した場合も、ここに反映された状態で表示されます。内容の変更は管理者にご相談ください。
+          </p>
         </div>
       ) : null}
 
-      {!hasSubmitted && overLimit && (
+      {hasRegisteredMonths && displaySummary ? (
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">登録済みの利用予定</h2>
+            <p className="mt-1 text-xs text-slate-600">
+              過去月の内容もここで確認できます。表示月を切り替えてください。
+            </p>
+          </div>
+
+          {user.submittedMonths.length > 1 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <label className="text-sm font-medium text-slate-700">
+                表示月
+                <select
+                  value={viewMonth}
+                  onChange={(e) => setViewMonth(e.target.value)}
+                  className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
+                >
+                  {user.submittedMonths.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                      {m === user.openMonth ? "（申請受付月）" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600">表示中: {viewMonth}</p>
+          )}
+
+          <SubmittedCalendar
+            year={Number(viewMonth.split("-")[0])}
+            monthIndex={Number(viewMonth.split("-")[1]) - 1}
+            dayMap={Object.fromEntries(
+              Object.entries(displaySummary.days).map(([k, v]) => [
+                k,
+                { facilityName: v.facilityName, notes: v.notes },
+              ])
+            )}
+          />
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100 sm:p-5">
+            <h3 className="text-base font-bold text-slate-900">連絡事項（登録内容）</h3>
+            <div className="mt-4 space-y-4">
+              <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                <p className="text-xs font-bold text-slate-600">全体</p>
+                <p className="mt-2 min-h-[1.25rem] whitespace-pre-wrap text-base leading-relaxed text-slate-900">
+                  {displaySummary.overallNotes?.trim() ? displaySummary.overallNotes : (
+                    <span className="text-slate-400">なし</span>
+                  )}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                <p className="text-xs font-bold text-slate-600">日ごと</p>
+                <ul className="mt-2 space-y-3">
+                  {Object.entries(displaySummary.days)
+                    .filter(([, v]) => v.notes?.trim())
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, v]) => (
+                      <li
+                        key={key}
+                        className="rounded-lg border border-slate-200 bg-white p-3 text-base leading-relaxed text-slate-900 shadow-sm"
+                      >
+                        <span className="block text-sm font-bold text-slate-700">
+                          {formatMonthDayWeekdayJapanYmd(key)}
+                        </span>
+                        <span className="mt-1 block whitespace-pre-wrap">{v.notes}</span>
+                      </li>
+                    ))}
+                </ul>
+                {!Object.values(displaySummary.days).some((v) => v.notes?.trim()) && (
+                  <p className="mt-2 text-base text-slate-400">なし</p>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 shadow-sm ring-1 ring-indigo-100 sm:p-5">
+            <h3 className="text-base font-bold text-slate-900">管理者による変更履歴</h3>
+            <p className="mt-1 text-xs text-slate-600">
+              管理者が申請内容を修正・保存したときの記録です。各回の内容は、その時点で保存されたスナップショットです。
+            </p>
+            {adminEditHistory.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-700">
+                まだ管理者による変更はありません（ご自身の申請の直後、または管理者が未対応の場合）。
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {adminEditHistory.map((h, idx) => (
+                  <li
+                    key={h.id}
+                    className="rounded-xl border border-indigo-100 bg-white p-3 text-sm text-slate-800 shadow-sm"
+                  >
+                    <p className="font-semibold text-slate-900">
+                      {idx + 1}回目 · {h.editedAtText}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      対応者: {h.editorName}（{h.editorLoginId}）
+                    </p>
+                    <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs">
+                      <p className="font-bold text-slate-600">全体連絡事項</p>
+                      <p className="mt-1 whitespace-pre-wrap text-slate-800">
+                        {h.overallNotes?.trim() ? h.overallNotes : "なし"}
+                      </p>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-xs font-bold text-slate-600">日別</p>
+                      <ul className="mt-1 space-y-1.5">
+                        {h.dayRows.map((d) => (
+                          <li
+                            key={`${h.id}-${d.date}`}
+                            className="rounded-md border border-slate-100 bg-white px-2 py-1.5 text-xs leading-snug"
+                          >
+                            <span className="font-semibold text-slate-800">
+                              {formatMonthDayWeekdayJapanYmd(d.date)}
+                            </span>
+                            <span className="text-slate-600"> · {d.facilityName}</span>
+                            {d.notes.trim() ? (
+                              <p className="mt-0.5 whitespace-pre-wrap text-slate-700">{d.notes}</p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      ) : null}
+
+      {!hasSubmittedOpenMonth && overLimit && (
         <div
           className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
           role="status"
@@ -384,13 +389,21 @@ export function ApplyPageClient({
         </div>
       )}
 
-      {!hasSubmitted && !hasFacilities && (
+      {!hasSubmittedOpenMonth && !hasFacilities && (
         <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
           利用可能な事業所が設定されていないため申請できません。管理者が利用者設定を確認してください。
         </div>
       )}
-      {!hasSubmitted && (
+      {!hasSubmittedOpenMonth && (
         <>
+          {!hasRegisteredMonths ? null : (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+              <p className="font-semibold">{user.openMonth} の申請</p>
+              <p className="mt-1 text-xs leading-relaxed">
+                申請受付月が切り替わりました。下のカレンダーから {user.openMonth} の利用予定を選択して送信してください。
+              </p>
+            </div>
+          )}
           <div className="apply-calendar overflow-x-auto rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
             <div className="mb-3">
               <p className="text-xs font-medium text-slate-600">曜日を一括選択</p>
@@ -540,7 +553,7 @@ export function ApplyPageClient({
         </p>
       )}
 
-      {!hasSubmitted && (
+      {!hasSubmittedOpenMonth && (
         <button
           type="button"
           disabled={submitting || selected.length === 0 || !hasFacilities}

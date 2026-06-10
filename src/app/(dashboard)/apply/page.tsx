@@ -142,8 +142,13 @@ export default async function ApplyPage() {
     )
   );
 
-  const adminEditLogs = await queryAdminEditLogsForTargetMonth(prisma, user.id, openMonth);
-  const adminEditHistory = buildUserAdminEditHistory(adminEditLogs, facilityNameById);
+  const adminEditHistoryByMonth: Record<string, UserAdminEditHistoryItem[]> = {};
+  await Promise.all(
+    submittedMonths.map(async (m) => {
+      const logs = await queryAdminEditLogsForTargetMonth(prisma, user.id, m);
+      adminEditHistoryByMonth[m] = buildUserAdminEditHistory(logs, facilityNameById);
+    })
+  );
 
   const allowed = (() => {
     try {
@@ -167,7 +172,7 @@ export default async function ApplyPage() {
         submissionSummary: openMonthSummary,
         summariesByMonth,
         submittedMonths,
-        adminEditHistory,
+        adminEditHistoryByMonth,
       }}
       facilities={filteredFacilities}
     />
