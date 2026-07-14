@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { ApplyPageClient } from "@/components/apply/apply-page-client";
 import { queryAdminEditLogsForTargetMonth } from "@/lib/application-admin-edit-log";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
+import { getNonApplicableDatesForMonth } from "@/lib/non-applicable-days";
 
 type SnapshotPayload = {
   days?: { date: string; facilityId: string; notes?: string }[];
@@ -160,6 +161,8 @@ export default async function ApplyPage() {
   const filteredFacilities =
     allowed.length > 0 ? facilities.filter((f) => allowed.includes(f.id)) : facilities;
 
+  const nonApplicableDates = await getNonApplicableDatesForMonth(prisma, openMonth);
+
   return (
     <ApplyPageClient
       user={{
@@ -173,6 +176,7 @@ export default async function ApplyPage() {
         summariesByMonth,
         submittedMonths,
         adminEditHistoryByMonth,
+        nonApplicableDates,
       }}
       facilities={filteredFacilities}
     />

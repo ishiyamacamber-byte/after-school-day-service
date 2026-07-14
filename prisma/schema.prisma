@@ -54,6 +54,21 @@ model SystemConfig {
   @@map("system_configs")
 }
 
+/// 申請不可日（年末年始など）
+model NonApplicableDay {
+  id        String   @id @default(cuid())
+  /// yyyy-MM-dd（日本暦）
+  date      String   @unique
+  /// yyyy-MM（月フィルタ用）
+  month     String
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([month])
+  @@map("non_applicable_days")
+}
+
 /// 申請1行。同一 groupId で1回の送信をまとめる。
 /// date が null の行は「申請全体」の連絡事項（facility は任意）。
 model Application {

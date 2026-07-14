@@ -41,6 +41,8 @@ type UserPayload = {
   summariesByMonth: Record<string, SubmissionSummary>;
   submittedMonths: string[];
   adminEditHistoryByMonth: Record<string, UserAdminEditHistoryItem[]>;
+  /** 申請受付月の申請不可日（yyyy-MM-dd） */
+  nonApplicableDates: string[];
 };
 
 type DayEntry = {
@@ -89,6 +91,10 @@ export function ApplyPageClient({
   const showApplyForm = isViewingOpenMonth && !hasSubmittedOpenMonth;
   const displaySummary = user.summariesByMonth[activeMonth] ?? null;
   const adminEditHistory = user.adminEditHistoryByMonth[activeMonth] ?? [];
+  const blockedDates = useMemo(
+    () => new Set(user.nonApplicableDates),
+    [user.nonApplicableDates]
+  );
 
   useEffect(() => {
     setSubmittedAtText(user.submittedAtText);
@@ -157,6 +163,10 @@ export function ApplyPageClient({
 
   function toggleDate(d: Date) {
     const key = dateKey(d);
+    if (blockedDates.has(key)) {
+      setMessage("申請不可日は選択できません。");
+      return;
+    }
     const exists = selected.some((x) => dateKey(x) === key);
     if (exists) {
       onSelectMulti(selected.filter((x) => dateKey(x) !== key));
@@ -170,6 +180,7 @@ export function ApplyPageClient({
     const lastDay = openMonthEnd.getDate();
     for (let day = 1; day <= lastDay; day++) {
       const key = formatYmdFromCalendarGrid(oy, om - 1, day);
+      if (blockedDates.has(key)) continue;
       if (getDayOfWeekSun0JapanYmd(key) === weekday) out.push(parseYmdAsTokyoNoon(key));
     }
     return out;
@@ -192,6 +203,10 @@ export function ApplyPageClient({
     }
     if (selected.length === 0) {
       setMessage("日付を1日以上選択してください。");
+      return;
+    }
+    if (selected.some((d) => blockedDates.has(dateKey(d)))) {
+      setMessage("申請不可日が含まれています。選択を見直してください。");
       return;
     }
     setSubmitting(true);
@@ -217,8 +232,12 @@ export function ApplyPageClient({
     });
     setSubmitting(false);
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      setMessage(`送信に失敗しました。${j.error ? ` (${j.error})` : ""}`);
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (j.error === "date_not_applicable") {
+        setMessage("申請不可日が含まれているため送信できません。選択を見直してください。");
+      } else {
+        setMessage(`送信に失敗しました。${j.error ? ` (${j.error})` : ""}`);
+      }
       return;
     }
     setMessage("申請を受け付けました。");
@@ -430,6 +449,11 @@ export function ApplyPageClient({
             </h2>
             <p className="mt-1 text-xs text-slate-600">
               カレンダーで日付を選び、内容を入力して送信してください。
+              {blockedDates.size > 0 ? (
+                <span className="mt-1 block text-rose-700">
+                  赤い日付は申請不可日です（年末年始など）。選択できません。
+                </span>
+              ) : null}
             </p>
           </div>
           <div className="apply-calendar overflow-x-auto rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
@@ -475,23 +499,31 @@ export function ApplyPageClient({
                   const day = i + 1;
                   const key = formatYmdFromCalendarGrid(oy, om - 1, day);
                   const d = parseYmdAsTokyoNoon(key);
-                  const isSelected = selected.some((x) => dateKey(x) === key);
-                  const label = facilityLabelForDate(d);
+                  const isBlocked = blockedDates.has(key);
+                  const isSelected = !isBlocked && selected.some((x) => dateKey(x) === key);
+                  const label = isBlocked ? "申請不可" : facilityLabelForDate(d);
                   return (
                     <button
                       key={key}
                       type="button"
+                      disabled={isBlocked}
                       onClick={() => toggleDate(d)}
                       className={`flex min-h-[5rem] flex-col rounded-2xl border-2 p-2 text-left sm:min-h-[5.5rem] sm:p-2.5 ${
-                        isSelected
-                          ? "border-blue-400 bg-gradient-to-b from-blue-50 to-white shadow-sm"
-                          : "border-slate-100 bg-slate-50/90"
+                        isBlocked
+                          ? "cursor-not-allowed border-rose-200 bg-rose-50 opacity-80"
+                          : isSelected
+                            ? "border-blue-400 bg-gradient-to-b from-blue-50 to-white shadow-sm"
+                            : "border-slate-100 bg-slate-50/90"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1 border-b border-slate-200/80 pb-1">
                         <span
                           className={`text-base font-bold leading-none tabular-nums sm:text-lg ${
-                            isSelected ? "text-slate-900" : "text-slate-500"
+                            isBlocked
+                              ? "text-rose-800"
+                              : isSelected
+                                ? "text-slate-900"
+                                : "text-slate-500"
                           }`}
                         >
                           {day}
@@ -502,11 +534,13 @@ export function ApplyPageClient({
                       </div>
                       <p
                         className={`mt-1.5 line-clamp-4 text-left text-[11px] leading-snug sm:text-xs ${
-                          label
-                            ? isSelected
-                              ? "font-bold text-blue-950"
-                              : "text-slate-700"
-                            : "text-transparent"
+                          isBlocked
+                            ? "font-semibold text-rose-700"
+                            : label
+                              ? isSelected
+                                ? "font-bold text-blue-950"
+                                : "text-slate-700"
+                              : "text-transparent"
                         }`}
                       >
                         {label || "　"}

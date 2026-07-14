@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { ApplicationsAdminClient } from "@/components/admin/applications-admin-client";
 import { countDaysByFacility, facilityCountsList } from "@/lib/admin-application-list";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
+import { getNonApplicableDatesForMonth } from "@/lib/non-applicable-days";
 
 function parseAllowedIds(raw: string | null | undefined): string[] {
   try {
@@ -261,6 +262,7 @@ export default async function AdminApplicationsPage({
   });
 
   const rowsForClient = groupedRows.map(({ submittedAt: _submittedAt, managementNumber: _mn, ...row }) => row);
+  const nonApplicableDates = await getNonApplicableDatesForMonth(prisma, month);
 
   return (
     <ApplicationsAdminClient
@@ -271,6 +273,7 @@ export default async function AdminApplicationsPage({
       listSort={listSort}
       unsubmittedFirst={unsubmittedFirst}
       openMonth={openMonthConfig?.value ?? month}
+      nonApplicableDates={nonApplicableDates}
       users={users.map(({ id, name, loginId }) => ({ id, name, loginId }))}
       facilities={facilities}
       rows={rowsForClient}

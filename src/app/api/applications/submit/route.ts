@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { appendApplicationRows } from "@/lib/google-sheets";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { isDateInMonthKey, monthEndExclusive, monthStart, toMonthKey } from "@/lib/month";
+import { getNonApplicableDateSetForMonth } from "@/lib/non-applicable-days";
 
 const daySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -56,6 +57,15 @@ export async function POST(req: Request) {
   }
   if (days.some((d) => !isDateInMonthKey(d.date, openMonth))) {
     return NextResponse.json({ error: "month_closed" }, { status: 400 });
+  }
+
+  const nonApplicable = await getNonApplicableDateSetForMonth(prisma, openMonth);
+  const blockedDates = days.filter((d) => nonApplicable.has(d.date)).map((d) => d.date);
+  if (blockedDates.length > 0) {
+    return NextResponse.json(
+      { error: "date_not_applicable", dates: blockedDates },
+      { status: 400 }
+    );
   }
 
   const facilityIds = [...new Set(days.map((d) => d.facilityId))];

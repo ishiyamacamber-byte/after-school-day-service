@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDateTimeJapan } from "@/lib/datetime-japan";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -59,6 +59,7 @@ export function ApplicationsAdminClient({
   listSort,
   unsubmittedFirst,
   openMonth,
+  nonApplicableDates,
   rows,
   users,
   facilities,
@@ -71,6 +72,8 @@ export function ApplicationsAdminClient({
   listSort: "submitted" | "submitted_desc" | "management";
   unsubmittedFirst: boolean;
   openMonth: string;
+  /** 表示月の申請不可日（yyyy-MM-dd） */
+  nonApplicableDates: string[];
   rows: Row[];
   users: User[];
   facilities: FacilityOpt[];
@@ -81,6 +84,7 @@ export function ApplicationsAdminClient({
   const [year, monthIndex] = month.split("-").map(Number);
   const firstDow = new Date(year, monthIndex - 1, 1).getDay();
   const daysInMonth = new Date(year, monthIndex, 0).getDate();
+  const blockedDates = useMemo(() => new Set(nonApplicableDates), [nonApplicableDates]);
   const [selectedOpenMonth, setSelectedOpenMonth] = useState(openMonth);
   const [busyMonth, setBusyMonth] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
@@ -238,6 +242,10 @@ export function ApplicationsAdminClient({
 
   function onEditCalendarDayClick(day: number) {
     const date = `${month}-${String(day).padStart(2, "0")}`;
+    if (blockedDates.has(date)) {
+      setMessage("申請不可日には選択できません。必要なら「申請不可日」管理で解除してください。");
+      return;
+    }
     upsertEditDay(date, {});
     setSelectedEditDate(date);
   }
@@ -256,6 +264,10 @@ export function ApplicationsAdminClient({
     if (dup.size !== editDays.length) return "同じ日付が重複しています。";
     if (editDays.some((d) => !d.date.startsWith(`${month}-`))) return `日付は ${month} のみ指定できます。`;
     if (editDays.some((d) => !d.facilityId)) return "事業所を選択してください。";
+    const blocked = editDays.filter((d) => blockedDates.has(d.date)).map((d) => d.date);
+    if (blocked.length > 0) {
+      return `申請不可日が含まれています（${blocked.join("、")}）。「申請不可日」管理で解除するか、該当日を削除してください。`;
+    }
     return null;
   }
 
@@ -826,6 +838,7 @@ export function ApplicationsAdminClient({
                         const date = `${month}-${String(day).padStart(2, "0")}`;
                         const editDayForCell = editDays.find((d) => d.date === date);
                         const isActive = selectedEditDate === date;
+                        const isBlocked = blockedDates.has(date);
                         const facilityLabel = editDayForCell ? facilityName(editDayForCell.facilityId) : "";
                         return (
                           <button
@@ -833,20 +846,32 @@ export function ApplicationsAdminClient({
                             type="button"
                             onClick={() => onEditCalendarDayClick(day)}
                             className={`min-h-[3.25rem] rounded-md border p-1 text-left ${
-                              isActive
-                                ? "border-blue-600 bg-blue-100"
-                                : editDayForCell
-                                  ? "border-blue-300 bg-blue-50"
-                                  : "border-slate-200 bg-white"
+                              isBlocked
+                                ? "border-rose-300 bg-rose-50 opacity-80"
+                                : isActive
+                                  ? "border-blue-600 bg-blue-100"
+                                  : editDayForCell
+                                    ? "border-blue-300 bg-blue-50"
+                                    : "border-slate-200 bg-white"
                             }`}
                           >
                             <div
-                              className={`text-xs font-bold ${editDayForCell ? "text-slate-900" : "text-slate-400"}`}
+                              className={`text-xs font-bold ${
+                                isBlocked
+                                  ? "text-rose-800"
+                                  : editDayForCell
+                                    ? "text-slate-900"
+                                    : "text-slate-400"
+                              }`}
                             >
                               {day}
                             </div>
                             <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-slate-700">
-                              {editDayForCell ? facilityLabel.trim() || "（未選択）" : "—"}
+                              {isBlocked
+                                ? "申請不可"
+                                : editDayForCell
+                                  ? facilityLabel.trim() || "（未選択）"
+                                  : "—"}
                             </div>
                           </button>
                         );

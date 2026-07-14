@@ -69,6 +69,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
               >
                 通信管理
               </Link>
+              <Link
+                href="/admin/non-applicable-days"
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 active:bg-slate-50"
+              >
+                申請不可日
+              </Link>
             </>
           )}
           <SignOutButton />
