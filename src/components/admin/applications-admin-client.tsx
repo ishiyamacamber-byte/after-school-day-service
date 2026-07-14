@@ -242,10 +242,6 @@ export function ApplicationsAdminClient({
 
   function onEditCalendarDayClick(day: number) {
     const date = `${month}-${String(day).padStart(2, "0")}`;
-    if (blockedDates.has(date)) {
-      setMessage("申請不可日には選択できません。必要なら「申請不可日」管理で解除してください。");
-      return;
-    }
     upsertEditDay(date, {});
     setSelectedEditDate(date);
   }
@@ -264,10 +260,6 @@ export function ApplicationsAdminClient({
     if (dup.size !== editDays.length) return "同じ日付が重複しています。";
     if (editDays.some((d) => !d.date.startsWith(`${month}-`))) return `日付は ${month} のみ指定できます。`;
     if (editDays.some((d) => !d.facilityId)) return "事業所を選択してください。";
-    const blocked = editDays.filter((d) => blockedDates.has(d.date)).map((d) => d.date);
-    if (blocked.length > 0) {
-      return `申請不可日が含まれています（${blocked.join("、")}）。「申請不可日」管理で解除するか、該当日を削除してください。`;
-    }
     return null;
   }
 
@@ -811,6 +803,11 @@ export function ApplicationsAdminClient({
                   </label>
                   <p className="mt-3 text-xs text-slate-600">
                     カレンダーの日付をクリックするとその日を選択します（まだない日は追加されます）。各セルには事業所名を表示します。削除は下の「この日を削除」から行ってください。
+                    {blockedDates.size > 0 ? (
+                      <span className="mt-1 block text-rose-700">
+                        赤い日付は申請不可日（休業日）です。既に申請された日の削除・修正は可能です。
+                      </span>
+                    ) : null}
                   </p>
                   <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div className="grid grid-cols-7 gap-1">
@@ -846,12 +843,14 @@ export function ApplicationsAdminClient({
                             type="button"
                             onClick={() => onEditCalendarDayClick(day)}
                             className={`min-h-[3.25rem] rounded-md border p-1 text-left ${
-                              isBlocked
-                                ? "border-rose-300 bg-rose-50 opacity-80"
-                                : isActive
-                                  ? "border-blue-600 bg-blue-100"
-                                  : editDayForCell
-                                    ? "border-blue-300 bg-blue-50"
+                              isActive
+                                ? "border-blue-600 bg-blue-100"
+                                : editDayForCell
+                                  ? isBlocked
+                                    ? "border-rose-400 bg-rose-100"
+                                    : "border-blue-300 bg-blue-50"
+                                  : isBlocked
+                                    ? "border-rose-200 bg-rose-50/70"
                                     : "border-slate-200 bg-white"
                             }`}
                           >
@@ -867,10 +866,10 @@ export function ApplicationsAdminClient({
                               {day}
                             </div>
                             <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-slate-700">
-                              {isBlocked
-                                ? "申請不可"
-                                : editDayForCell
-                                  ? facilityLabel.trim() || "（未選択）"
+                              {editDayForCell
+                                ? facilityLabel.trim() || "（未選択）"
+                                : isBlocked
+                                  ? "休業日"
                                   : "—"}
                             </div>
                           </button>

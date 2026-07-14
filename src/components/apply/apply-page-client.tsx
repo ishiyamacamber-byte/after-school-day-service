@@ -164,7 +164,7 @@ export function ApplyPageClient({
   function toggleDate(d: Date) {
     const key = dateKey(d);
     if (blockedDates.has(key)) {
-      setMessage("申請不可日は選択できません。");
+      setMessage("休業日は選択できません。");
       return;
     }
     const exists = selected.some((x) => dateKey(x) === key);
@@ -206,7 +206,7 @@ export function ApplyPageClient({
       return;
     }
     if (selected.some((d) => blockedDates.has(dateKey(d)))) {
-      setMessage("申請不可日が含まれています。選択を見直してください。");
+      setMessage("休業日が含まれています。選択を見直してください。");
       return;
     }
     setSubmitting(true);
@@ -234,7 +234,7 @@ export function ApplyPageClient({
     if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string };
       if (j.error === "date_not_applicable") {
-        setMessage("申請不可日が含まれているため送信できません。選択を見直してください。");
+        setMessage("休業日が含まれているため送信できません。選択を見直してください。");
       } else {
         setMessage(`送信に失敗しました。${j.error ? ` (${j.error})` : ""}`);
       }
@@ -451,7 +451,7 @@ export function ApplyPageClient({
               カレンダーで日付を選び、内容を入力して送信してください。
               {blockedDates.size > 0 ? (
                 <span className="mt-1 block text-rose-700">
-                  赤い日付は申請不可日です（年末年始など）。選択できません。
+                  赤い日付は休業日です（年末年始など）。選択できません。
                 </span>
               ) : null}
             </p>
@@ -501,7 +501,7 @@ export function ApplyPageClient({
                   const d = parseYmdAsTokyoNoon(key);
                   const isBlocked = blockedDates.has(key);
                   const isSelected = !isBlocked && selected.some((x) => dateKey(x) === key);
-                  const label = isBlocked ? "申請不可" : facilityLabelForDate(d);
+                  const label = isBlocked ? "休業日" : facilityLabelForDate(d);
                   return (
                     <button
                       key={key}

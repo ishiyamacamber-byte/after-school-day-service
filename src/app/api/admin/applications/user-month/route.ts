@@ -7,7 +7,6 @@ import { appendApplicationRows } from "@/lib/google-sheets";
 import { prisma } from "@/lib/prisma";
 import { deleteApplicationsForCalendarMonth } from "@/lib/application-calendar-month";
 import { isDateInMonthKey } from "@/lib/month";
-import { getNonApplicableDateSetForMonth } from "@/lib/non-applicable-days";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -66,14 +65,6 @@ export async function PATCH(req: Request) {
   const uniqDays = new Set(days.map((d) => d.date));
   if (uniqDays.size !== days.length) {
     return NextResponse.json({ error: "duplicate_date" }, { status: 400 });
-  }
-  const nonApplicable = await getNonApplicableDateSetForMonth(prisma, month);
-  const blockedDates = days.filter((d) => nonApplicable.has(d.date)).map((d) => d.date);
-  if (blockedDates.length > 0) {
-    return NextResponse.json(
-      { error: "date_not_applicable", dates: blockedDates },
-      { status: 400 }
-    );
   }
 
   const [user, facilities] = await Promise.all([
