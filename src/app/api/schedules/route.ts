@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { formatDateYmdJapan } from "@/lib/datetime-japan";
+import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
     prisma.facility.findMany({ select: { id: true, name: true }, orderBy: FACILITY_LIST_ORDER_BY }),
     prisma.facilityMonthlyScheduleImage.findMany({
       where: { month },
-      select: { facilityId: true, uploadedAt: true },
+      select: { facilityId: true, uploadedAt: true, filePath: true },
     }),
   ]);
 
@@ -36,6 +37,7 @@ export async function GET(req: Request) {
         facilityName: f.name,
         hasImage: !!current,
         uploadedAtIso: current?.uploadedAt.toISOString() ?? null,
+        mediaKind: current ? mediaKindFromRelativePath(current.filePath) : null,
         imageUrl: current
           ? `/api/schedules/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(month)}`
           : null,

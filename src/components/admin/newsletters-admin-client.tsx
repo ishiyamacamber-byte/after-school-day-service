@@ -9,6 +9,7 @@ type Row = {
   hasImage: boolean;
   uploadedAtIso: string | null;
   uploadedById: string | null;
+  mediaKind: "image" | "pdf" | null;
   imageUrl: string | null;
 };
 
@@ -62,10 +63,10 @@ export function NewslettersAdminClient({
     const json = (await res.json().catch(() => ({}))) as { error?: string };
     setBusy(false);
     if (!res.ok) {
-      if (json.error === "file_must_be_png") {
-        setMessage("PNG形式のファイルを選択してください。");
+      if (json.error === "file_type_not_allowed" || json.error === "file_must_be_png") {
+        setMessage("PNG / JPEG / PDF のいずれかを選択してください。");
       } else if (json.error === "file_too_large") {
-        setMessage("ファイルサイズが大きすぎます（8MBまで）。");
+        setMessage("ファイルサイズが大きすぎます（12MBまで）。");
       } else {
         setMessage("アップロードに失敗しました。");
       }
@@ -99,7 +100,7 @@ export function NewslettersAdminClient({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100">
         <h1 className="text-lg font-bold text-slate-900">通信画像の管理</h1>
         <p className="mt-1 text-xs text-slate-600">
-          事業所ごとに月別PNGを登録します。再アップロードで差し替えできます。
+          事業所ごとに月別ファイル（PNG / JPEG / PDF）を登録します。再アップロードで差し替えできます。
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <input
@@ -136,20 +137,38 @@ export function NewslettersAdminClient({
                 <p className="mt-1 text-xs text-slate-500">この月の画像は未登録です。</p>
               )}
               {current.imageUrl ? (
-                <button
-                  type="button"
-                  onClick={() => setZoom({ name: r.facilityName, url: current.imageUrl! })}
-                  className="mt-3 block w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"
-                >
-                  <img src={current.imageUrl} alt={`${r.facilityName} ${month}`} className="h-auto w-full" />
-                  <p className="mt-2 text-xs text-blue-700">クリックして拡大</p>
-                </button>
+                current.mediaKind === "pdf" ? (
+                  <div className="mt-3 space-y-2">
+                    <iframe
+                      src={current.imageUrl}
+                      title={`${r.facilityName} ${month}`}
+                      className="h-64 w-full rounded-xl border border-slate-200 bg-white"
+                    />
+                    <a
+                      href={current.imageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800"
+                    >
+                      PDFを開く
+                    </a>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setZoom({ name: r.facilityName, url: current.imageUrl! })}
+                    className="mt-3 block w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"
+                  >
+                    <img src={current.imageUrl} alt={`${r.facilityName} ${month}`} className="h-auto w-full" />
+                    <p className="mt-2 text-xs text-blue-700">クリックして拡大</p>
+                  </button>
+                )
               ) : null}
 
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   type="file"
-                  accept="image/png,.png"
+                  accept="image/png,image/jpeg,.png,.jpg,.jpeg,application/pdf,.pdf"
                   onChange={(e) =>
                     setFileByFacility((prev) => ({
                       ...prev,

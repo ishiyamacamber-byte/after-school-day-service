@@ -2,16 +2,11 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { detectUploadMedia } from "@/lib/facility-media-file";
 import { removeNewsletterImage, writeNewsletterImage } from "@/lib/newsletter-image-storage";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
-
-function isPngFile(file: File): boolean {
-  const byType = file.type === "image/png";
-  const byName = file.name.toLowerCase().endsWith(".png");
-  return byType || byName;
-}
+const MAX_FILE_BYTES = 12 * 1024 * 1024;
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -27,8 +22,9 @@ export async function POST(req: Request) {
   if (!(file instanceof File) || !facilityId || !MONTH_RE.test(month)) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
-  if (!isPngFile(file)) {
-    return NextResponse.json({ error: "file_must_be_png" }, { status: 400 });
+  const media = detectUploadMedia(file);
+  if (!media) {
+    return NextResponse.json({ error: "file_type_not_allowed" }, { status: 400 });
   }
   if (file.size <= 0 || file.size > MAX_FILE_BYTES) {
     return NextResponse.json({ error: "file_too_large" }, { status: 400 });
@@ -40,7 +36,7 @@ export async function POST(req: Request) {
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const nextFilePath = await writeNewsletterImage(facilityId, month, bytes);
+  const nextFilePath = await writeNewsletterImage(facilityId, month, bytes, media.ext);
 
   try {
     const existing = await prisma.facilityMonthlyNewsletterImage.findUnique({
@@ -74,6 +70,7 @@ export async function POST(req: Request) {
       facilityId,
       month,
       uploadedAtIso: saved.uploadedAt.toISOString(),
+      mediaKind: media.ext === "pdf" ? "pdf" : "image",
       imageUrl: `/api/newsletters/image?facilityId=${encodeURIComponent(facilityId)}&month=${encodeURIComponent(month)}`,
     });
   } catch (e) {

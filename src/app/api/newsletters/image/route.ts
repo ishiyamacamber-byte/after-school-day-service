@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { contentTypeFromRelativePath } from "@/lib/facility-media-file";
 import { readNewsletterImage } from "@/lib/newsletter-image-storage";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
   return new NextResponse(bytes, {
     status: 200,
     headers: {
-      "Content-Type": "image/png",
+      "Content-Type": contentTypeFromRelativePath(row.filePath),
       "Cache-Control": "private, max-age=60",
     },
   });

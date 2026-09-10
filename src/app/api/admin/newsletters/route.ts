@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { removeNewsletterImage } from "@/lib/newsletter-image-storage";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
+import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
 
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
 
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
     prisma.facility.findMany({ select: { id: true, name: true }, orderBy: FACILITY_LIST_ORDER_BY }),
     prisma.facilityMonthlyNewsletterImage.findMany({
       where: { month },
-      select: { facilityId: true, uploadedAt: true, uploadedById: true },
+      select: { facilityId: true, uploadedAt: true, uploadedById: true, filePath: true },
     }),
   ]);
   const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
@@ -46,6 +47,7 @@ export async function GET(req: Request) {
         hasImage: !!current,
         uploadedAtIso: current?.uploadedAt.toISOString() ?? null,
         uploadedById: current?.uploadedById ?? null,
+        mediaKind: current ? mediaKindFromRelativePath(current.filePath) : null,
         imageUrl: current
           ? `/api/newsletters/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(month)}`
           : null,

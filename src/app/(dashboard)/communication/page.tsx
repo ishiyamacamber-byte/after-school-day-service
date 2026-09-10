@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { formatDateYmdJapan } from "@/lib/datetime-japan";
 import { NewsletterGalleryClient } from "@/components/communication/newsletter-gallery-client";
+import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
 
 function monthLabelJa(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -30,7 +31,7 @@ export default async function CommunicationPage({
     }),
     prisma.facilityMonthlyNewsletterImage.findMany({
       where: { month },
-      select: { facilityId: true, uploadedAt: true },
+      select: { facilityId: true, uploadedAt: true, filePath: true },
     }),
   ]);
   const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
@@ -43,6 +44,7 @@ export default async function CommunicationPage({
         facilityId: f.id,
         facilityName: f.name,
         uploadedAtIso: row.uploadedAt.toISOString(),
+        mediaKind: mediaKindFromRelativePath(row.filePath),
         imageUrl: `/api/newsletters/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(month)}`,
       };
     })
@@ -56,7 +58,7 @@ export default async function CommunicationPage({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100">
         <h1 className="text-lg font-bold text-slate-900">通信</h1>
         <p className="mt-1 text-xs text-slate-600">
-          事業所ごとの通信（PNG）です。利用設定に関係なく、すべての事業所で登録されたものを表示します。
+          事業所ごとの通信（PNG / JPEG / PDF）です。利用設定に関係なく、すべての事業所で登録されたものを表示します。
         </p>
         <form method="GET" className="mt-3 flex items-center gap-2">
           <input

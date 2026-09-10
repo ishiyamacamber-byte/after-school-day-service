@@ -105,7 +105,7 @@ model ApplicationAdminEditLog {
   @@map("application_admin_edit_logs")
 }
 
-/// 事業所ごとの月別予定表画像（PNG）
+/// 事業所ごとの月別予定表ファイル（PNG / JPEG / PDF）
 model FacilityMonthlyScheduleImage {
   id           String   @id @default(cuid())
   facilityId   String   @map("facility_id")
@@ -123,7 +123,7 @@ model FacilityMonthlyScheduleImage {
   @@map("facility_monthly_schedule_images")
 }
 
-/// 事業所ごとの月別通信（ニュースレター）画像（PNG）
+/// 事業所ごとの月別通信ファイル（PNG / JPEG / PDF）
 model FacilityMonthlyNewsletterImage {
   id           String   @id @default(cuid())
   facilityId   String   @map("facility_id")

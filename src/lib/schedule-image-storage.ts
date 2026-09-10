@@ -1,8 +1,11 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
+import type { MediaExt } from "@/lib/facility-media-file";
+import { isAllowedMediaExt } from "@/lib/facility-media-file";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const FACILITY_ID_RE = /^[a-zA-Z0-9_-]+$/;
+const SIBLING_EXTS: MediaExt[] = ["png", "jpg", "pdf"];
 
 export function isValidMonthKey(month: string): boolean {
   return MONTH_RE.test(month);
@@ -26,10 +29,17 @@ export function getScheduleImageRootDir(): string {
   return path.join(process.cwd(), "data", "schedules");
 }
 
-export function buildScheduleImageRelativePath(facilityId: string, month: string): string {
+export function buildScheduleImageRelativePath(
+  facilityId: string,
+  month: string,
+  ext: MediaExt = "png"
+): string {
   assertValidFacilityId(facilityId);
   assertValidMonthKey(month);
-  return path.posix.join(month, `${facilityId}.png`);
+  if (!isAllowedMediaExt(ext)) {
+    throw new Error("invalid_ext");
+  }
+  return path.posix.join(month, `${facilityId}.${ext}`);
 }
 
 function resolveSafeAbsolutePath(relativePath: string): string {
@@ -45,12 +55,22 @@ function resolveSafeAbsolutePath(relativePath: string): string {
 export async function writeScheduleImage(
   facilityId: string,
   month: string,
-  pngBytes: Uint8Array
+  bytes: Uint8Array,
+  ext: MediaExt
 ): Promise<string> {
-  const relativePath = buildScheduleImageRelativePath(facilityId, month);
+  const relativePath = buildScheduleImageRelativePath(facilityId, month, ext);
   const absolutePath = resolveSafeAbsolutePath(relativePath);
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-  await fs.writeFile(absolutePath, pngBytes);
+  await fs.writeFile(absolutePath, bytes);
+
+  // 拡張子が変わった差し替えで古いファイルが残らないようにする
+  await Promise.all(
+    SIBLING_EXTS.filter((e) => e !== ext).map(async (e) => {
+      const sibling = buildScheduleImageRelativePath(facilityId, month, e);
+      await removeScheduleImage(sibling);
+    })
+  );
+
   return relativePath;
 }
 
@@ -66,4 +86,3 @@ export async function removeScheduleImage(relativePath: string): Promise<void> {
     throw e;
   });
 }
-

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { formatDateYmdJapan } from "@/lib/datetime-japan";
 import { NewslettersAdminClient } from "@/components/admin/newsletters-admin-client";
+import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
 
 export default async function AdminNewslettersPage() {
   const session = await getServerSession(authOptions);
@@ -17,7 +18,7 @@ export default async function AdminNewslettersPage() {
     prisma.facility.findMany({ select: { id: true, name: true }, orderBy: FACILITY_LIST_ORDER_BY }),
     prisma.facilityMonthlyNewsletterImage.findMany({
       where: { month: initialMonth },
-      select: { facilityId: true, uploadedAt: true, uploadedById: true },
+      select: { facilityId: true, uploadedAt: true, uploadedById: true, filePath: true },
     }),
   ]);
   const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
@@ -33,6 +34,7 @@ export default async function AdminNewslettersPage() {
           hasImage: !!current,
           uploadedAtIso: current?.uploadedAt.toISOString() ?? null,
           uploadedById: current?.uploadedById ?? null,
+          mediaKind: current ? mediaKindFromRelativePath(current.filePath) : null,
           imageUrl: current
             ? `/api/newsletters/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(initialMonth)}`
             : null,

@@ -2,16 +2,41 @@
 
 import { useState } from "react";
 import { formatDateTimeJapan } from "@/lib/datetime-japan";
+import type { MediaKind } from "@/lib/facility-media-file";
 
 type Row = {
   facilityId: string;
   facilityName: string;
   imageUrl: string;
+  mediaKind: MediaKind;
   uploadedAtIso: string | null;
 };
 
+function MediaPreview({
+  url,
+  kind,
+  alt,
+  className,
+}: {
+  url: string;
+  kind: MediaKind;
+  alt: string;
+  className?: string;
+}) {
+  if (kind === "pdf") {
+    return (
+      <iframe
+        src={url}
+        title={alt}
+        className={className ?? "h-[28rem] w-full rounded-lg border border-slate-200 bg-white"}
+      />
+    );
+  }
+  return <img src={url} alt={alt} className={className ?? "h-auto w-full"} />;
+}
+
 export function NewsletterGalleryClient({ month, rows }: { month: string; rows: Row[] }) {
-  const [zoom, setZoom] = useState<{ name: string; url: string } | null>(null);
+  const [zoom, setZoom] = useState<{ name: string; url: string; kind: MediaKind } | null>(null);
 
   return (
     <>
@@ -30,14 +55,28 @@ export function NewsletterGalleryClient({ month, rows }: { month: string; rows: 
               {r.uploadedAtIso ? (
                 <p className="mt-1 text-xs text-slate-600">更新: {formatDateTimeJapan(r.uploadedAtIso)}</p>
               ) : null}
-              <button
-                type="button"
-                onClick={() => setZoom({ name: r.facilityName, url: r.imageUrl })}
-                className="mt-3 block w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"
-              >
-                <img src={r.imageUrl} alt={`${r.facilityName} ${month} 通信`} className="h-auto w-full" />
-                <p className="mt-2 text-xs text-blue-700">クリックして拡大</p>
-              </button>
+              {r.mediaKind === "pdf" ? (
+                <div className="mt-3 space-y-2">
+                  <MediaPreview url={r.imageUrl} kind="pdf" alt={`${r.facilityName} ${month} 通信`} />
+                  <a
+                    href={r.imageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800"
+                  >
+                    PDFを開く
+                  </a>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setZoom({ name: r.facilityName, url: r.imageUrl, kind: r.mediaKind })}
+                  className="mt-3 block w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"
+                >
+                  <MediaPreview url={r.imageUrl} kind="image" alt={`${r.facilityName} ${month} 通信`} />
+                  <p className="mt-2 text-xs text-blue-700">クリックして拡大</p>
+                </button>
+              )}
             </section>
           ))}
         </div>
@@ -62,7 +101,12 @@ export function NewsletterGalleryClient({ month, rows }: { month: string; rows: 
                 閉じる
               </button>
             </div>
-            <img src={zoom.url} alt={`${zoom.name} 拡大`} className="h-auto w-full" />
+            <MediaPreview
+              url={zoom.url}
+              kind={zoom.kind}
+              alt={`${zoom.name} 拡大`}
+              className={zoom.kind === "pdf" ? "h-[80vh] w-full" : "h-auto w-full"}
+            />
           </div>
         </div>
       ) : null}

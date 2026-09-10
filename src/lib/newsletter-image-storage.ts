@@ -1,8 +1,11 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
+import type { MediaExt } from "@/lib/facility-media-file";
+import { isAllowedMediaExt } from "@/lib/facility-media-file";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const FACILITY_ID_RE = /^[a-zA-Z0-9_-]+$/;
+const SIBLING_EXTS: MediaExt[] = ["png", "jpg", "pdf"];
 
 export function isValidMonthKey(month: string): boolean {
   return MONTH_RE.test(month);
@@ -26,10 +29,17 @@ export function getNewsletterImageRootDir(): string {
   return path.join(process.cwd(), "data", "newsletters");
 }
 
-export function buildNewsletterImageRelativePath(facilityId: string, month: string): string {
+export function buildNewsletterImageRelativePath(
+  facilityId: string,
+  month: string,
+  ext: MediaExt = "png"
+): string {
   assertValidFacilityId(facilityId);
   assertValidMonthKey(month);
-  return path.posix.join(month, `${facilityId}.png`);
+  if (!isAllowedMediaExt(ext)) {
+    throw new Error("invalid_ext");
+  }
+  return path.posix.join(month, `${facilityId}.${ext}`);
 }
 
 function resolveSafeAbsolutePath(relativePath: string): string {
@@ -45,12 +55,21 @@ function resolveSafeAbsolutePath(relativePath: string): string {
 export async function writeNewsletterImage(
   facilityId: string,
   month: string,
-  pngBytes: Uint8Array
+  bytes: Uint8Array,
+  ext: MediaExt
 ): Promise<string> {
-  const relativePath = buildNewsletterImageRelativePath(facilityId, month);
+  const relativePath = buildNewsletterImageRelativePath(facilityId, month, ext);
   const absolutePath = resolveSafeAbsolutePath(relativePath);
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-  await fs.writeFile(absolutePath, pngBytes);
+  await fs.writeFile(absolutePath, bytes);
+
+  await Promise.all(
+    SIBLING_EXTS.filter((e) => e !== ext).map(async (e) => {
+      const sibling = buildNewsletterImageRelativePath(facilityId, month, e);
+      await removeNewsletterImage(sibling);
+    })
+  );
+
   return relativePath;
 }
 
