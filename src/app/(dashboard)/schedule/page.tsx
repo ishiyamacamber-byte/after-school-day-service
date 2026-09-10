@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { formatDateYmdJapan } from "@/lib/datetime-japan";
 import { ScheduleGalleryClient } from "@/components/schedule/schedule-gallery-client";
-import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
+import { buildFacilityMediaFiles, groupMediaRowsByFacility } from "@/lib/facility-media-rows";
 
 function parseAllowedFacilityIds(raw: string | null | undefined): string[] {
   try {
@@ -51,17 +51,18 @@ export default async function SchedulePage({
     }),
     prisma.facilityMonthlyScheduleImage.findMany({
       where: { month },
-      select: { facilityId: true, uploadedAt: true, filePath: true },
+      select: { facilityId: true, slot: true, uploadedAt: true, filePath: true },
+      orderBy: [{ facilityId: "asc" }, { slot: "asc" }],
     }),
   ]);
-  const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
+  const byFacility = groupMediaRowsByFacility(rows);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100">
         <h1 className="text-lg font-bold text-slate-900">事業所別予定表</h1>
         <p className="mt-1 text-xs text-slate-600">
-          月を選ぶと、事業所ごとの予定表（PNG / JPEG / PDF）を確認できます。
+          月を選ぶと、事業所ごとの予定表（PNG / JPEG / PDF、最大2枚）を確認できます。
         </p>
         <form method="GET" className="mt-3 flex items-center gap-2">
           <input
@@ -82,20 +83,12 @@ export default async function SchedulePage({
 
       <ScheduleGalleryClient
         month={month}
-        rows={facilities.map((f) => {
-          const row = byFacility.get(f.id);
-          return {
-            facilityId: f.id,
-            facilityName: f.name,
-            uploadedAtIso: row?.uploadedAt.toISOString() ?? null,
-            mediaKind: row ? mediaKindFromRelativePath(row.filePath) : null,
-            imageUrl: row
-              ? `/api/schedules/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(month)}`
-              : null,
-          };
-        })}
+        rows={facilities.map((f) => ({
+          facilityId: f.id,
+          facilityName: f.name,
+          files: buildFacilityMediaFiles(byFacility.get(f.id) ?? [], month, "/api/schedules/image"),
+        }))}
       />
     </div>
   );
 }
-

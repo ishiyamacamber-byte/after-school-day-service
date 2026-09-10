@@ -1,7 +1,7 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import type { MediaExt } from "@/lib/facility-media-file";
-import { isAllowedMediaExt } from "@/lib/facility-media-file";
+import type { MediaExt, MediaSlot } from "@/lib/facility-media-file";
+import { buildFacilityMediaFileName, isAllowedMediaExt } from "@/lib/facility-media-file";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const FACILITY_ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -32,14 +32,15 @@ export function getScheduleImageRootDir(): string {
 export function buildScheduleImageRelativePath(
   facilityId: string,
   month: string,
-  ext: MediaExt = "png"
+  ext: MediaExt = "png",
+  slot: MediaSlot = 1
 ): string {
   assertValidFacilityId(facilityId);
   assertValidMonthKey(month);
   if (!isAllowedMediaExt(ext)) {
     throw new Error("invalid_ext");
   }
-  return path.posix.join(month, `${facilityId}.${ext}`);
+  return path.posix.join(month, buildFacilityMediaFileName(facilityId, slot, ext));
 }
 
 function resolveSafeAbsolutePath(relativePath: string): string {
@@ -56,17 +57,17 @@ export async function writeScheduleImage(
   facilityId: string,
   month: string,
   bytes: Uint8Array,
-  ext: MediaExt
+  ext: MediaExt,
+  slot: MediaSlot = 1
 ): Promise<string> {
-  const relativePath = buildScheduleImageRelativePath(facilityId, month, ext);
+  const relativePath = buildScheduleImageRelativePath(facilityId, month, ext, slot);
   const absolutePath = resolveSafeAbsolutePath(relativePath);
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
   await fs.writeFile(absolutePath, bytes);
 
-  // 拡張子が変わった差し替えで古いファイルが残らないようにする
   await Promise.all(
     SIBLING_EXTS.filter((e) => e !== ext).map(async (e) => {
-      const sibling = buildScheduleImageRelativePath(facilityId, month, e);
+      const sibling = buildScheduleImageRelativePath(facilityId, month, e, slot);
       await removeScheduleImage(sibling);
     })
   );

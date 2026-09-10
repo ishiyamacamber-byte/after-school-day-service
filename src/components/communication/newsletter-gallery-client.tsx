@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import { formatDateTimeJapan } from "@/lib/datetime-japan";
-import type { MediaKind } from "@/lib/facility-media-file";
+import type { MediaKind, MediaSlot } from "@/lib/facility-media-file";
+
+type MediaFile = {
+  slot: MediaSlot;
+  mediaKind: MediaKind;
+  imageUrl: string;
+  uploadedAtIso: string;
+};
 
 type Row = {
   facilityId: string;
   facilityName: string;
-  imageUrl: string;
-  mediaKind: MediaKind;
-  uploadedAtIso: string | null;
+  files: MediaFile[];
 };
 
 function MediaPreview({
@@ -52,31 +57,51 @@ export function NewsletterGalleryClient({ month, rows }: { month: string; rows: 
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100"
             >
               <h2 className="text-base font-semibold text-slate-900">{r.facilityName}</h2>
-              {r.uploadedAtIso ? (
-                <p className="mt-1 text-xs text-slate-600">更新: {formatDateTimeJapan(r.uploadedAtIso)}</p>
-              ) : null}
-              {r.mediaKind === "pdf" ? (
-                <div className="mt-3 space-y-2">
-                  <MediaPreview url={r.imageUrl} kind="pdf" alt={`${r.facilityName} ${month} 通信`} />
-                  <a
-                    href={r.imageUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800"
-                  >
-                    PDFを開く
-                  </a>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setZoom({ name: r.facilityName, url: r.imageUrl, kind: r.mediaKind })}
-                  className="mt-3 block w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"
-                >
-                  <MediaPreview url={r.imageUrl} kind="image" alt={`${r.facilityName} ${month} 通信`} />
-                  <p className="mt-2 text-xs text-blue-700">クリックして拡大</p>
-                </button>
-              )}
+              <div className="mt-3 space-y-4">
+                {r.files.map((file) => {
+                  const label = file.slot === 1 ? "1枚目" : "追加";
+                  return (
+                    <div key={file.slot}>
+                      <p className="text-xs font-medium text-slate-600">
+                        {label}
+                        {file.uploadedAtIso ? ` · 更新 ${formatDateTimeJapan(file.uploadedAtIso)}` : ""}
+                      </p>
+                      {file.mediaKind === "pdf" ? (
+                        <div className="mt-2 space-y-2">
+                          <MediaPreview url={file.imageUrl} kind="pdf" alt={`${r.facilityName} ${month} ${label}`} />
+                          <a
+                            href={file.imageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800"
+                          >
+                            PDFを開く
+                          </a>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setZoom({
+                              name: `${r.facilityName}（${label}）`,
+                              url: file.imageUrl,
+                              kind: "image",
+                            })
+                          }
+                          className="mt-2 block w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"
+                        >
+                          <MediaPreview
+                            url={file.imageUrl}
+                            kind="image"
+                            alt={`${r.facilityName} ${month} ${label}`}
+                          />
+                          <p className="mt-2 text-xs text-blue-700">クリックして拡大</p>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </section>
           ))}
         </div>
@@ -101,12 +126,7 @@ export function NewsletterGalleryClient({ month, rows }: { month: string; rows: 
                 閉じる
               </button>
             </div>
-            <MediaPreview
-              url={zoom.url}
-              kind={zoom.kind}
-              alt={`${zoom.name} 拡大`}
-              className={zoom.kind === "pdf" ? "h-[80vh] w-full" : "h-auto w-full"}
-            />
+            <MediaPreview url={zoom.url} kind={zoom.kind} alt={`${zoom.name} 拡大`} className="h-auto w-full" />
           </div>
         </div>
       ) : null}

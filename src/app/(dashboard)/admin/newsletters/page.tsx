@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { formatDateYmdJapan } from "@/lib/datetime-japan";
 import { NewslettersAdminClient } from "@/components/admin/newsletters-admin-client";
-import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
+import { buildFacilityMediaFiles, groupMediaRowsByFacility } from "@/lib/facility-media-rows";
 
 export default async function AdminNewslettersPage() {
   const session = await getServerSession(authOptions);
@@ -18,28 +18,20 @@ export default async function AdminNewslettersPage() {
     prisma.facility.findMany({ select: { id: true, name: true }, orderBy: FACILITY_LIST_ORDER_BY }),
     prisma.facilityMonthlyNewsletterImage.findMany({
       where: { month: initialMonth },
-      select: { facilityId: true, uploadedAt: true, uploadedById: true, filePath: true },
+      select: { facilityId: true, slot: true, uploadedAt: true, uploadedById: true, filePath: true },
+      orderBy: [{ facilityId: "asc" }, { slot: "asc" }],
     }),
   ]);
-  const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
+  const byFacility = groupMediaRowsByFacility(rows);
 
   return (
     <NewslettersAdminClient
       initialMonth={initialMonth}
-      initialRows={facilities.map((f) => {
-        const current = byFacility.get(f.id);
-        return {
-          facilityId: f.id,
-          facilityName: f.name,
-          hasImage: !!current,
-          uploadedAtIso: current?.uploadedAt.toISOString() ?? null,
-          uploadedById: current?.uploadedById ?? null,
-          mediaKind: current ? mediaKindFromRelativePath(current.filePath) : null,
-          imageUrl: current
-            ? `/api/newsletters/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(initialMonth)}`
-            : null,
-        };
-      })}
+      initialRows={facilities.map((f) => ({
+        facilityId: f.id,
+        facilityName: f.name,
+        files: buildFacilityMediaFiles(byFacility.get(f.id) ?? [], initialMonth, "/api/newsletters/image"),
+      }))}
     />
   );
 }

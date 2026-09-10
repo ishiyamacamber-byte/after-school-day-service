@@ -5,7 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { removeScheduleImage } from "@/lib/schedule-image-storage";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
-import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
+import { parseMediaSlot } from "@/lib/facility-media-file";
+import { buildFacilityMediaFiles, groupMediaRowsByFacility } from "@/lib/facility-media-rows";
 
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
 
@@ -32,25 +33,20 @@ export async function GET(req: Request) {
     prisma.facility.findMany({ select: { id: true, name: true }, orderBy: FACILITY_LIST_ORDER_BY }),
     prisma.facilityMonthlyScheduleImage.findMany({
       where: { month },
-      select: { facilityId: true, uploadedAt: true, uploadedById: true, filePath: true },
+      select: { facilityId: true, slot: true, uploadedAt: true, uploadedById: true, filePath: true },
+      orderBy: [{ facilityId: "asc" }, { slot: "asc" }],
     }),
   ]);
-  const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
+  const byFacility = groupMediaRowsByFacility(rows);
 
   return NextResponse.json({
     month,
     rows: facilities.map((f) => {
-      const current = byFacility.get(f.id);
+      const files = buildFacilityMediaFiles(byFacility.get(f.id) ?? [], month, "/api/schedules/image");
       return {
         facilityId: f.id,
         facilityName: f.name,
-        hasImage: !!current,
-        uploadedAtIso: current?.uploadedAt.toISOString() ?? null,
-        uploadedById: current?.uploadedById ?? null,
-        mediaKind: current ? mediaKindFromRelativePath(current.filePath) : null,
-        imageUrl: current
-          ? `/api/schedules/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(month)}`
-          : null,
+        files,
       };
     }),
   });
@@ -65,15 +61,17 @@ export async function DELETE(req: Request) {
     .object({
       facilityId: z.string().min(1),
       month: monthSchema,
+      slot: z.union([z.literal(1), z.literal(2)]).optional(),
     })
     .safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
   const { facilityId, month } = parsed.data;
+  const slot = parseMediaSlot(parsed.data.slot ?? 1) ?? 1;
 
   const existing = await prisma.facilityMonthlyScheduleImage.findUnique({
-    where: { facilityId_month: { facilityId, month } },
+    where: { facilityId_month_slot: { facilityId, month, slot } },
     select: { id: true, filePath: true },
   });
   if (!existing) {
@@ -83,6 +81,5 @@ export async function DELETE(req: Request) {
   await prisma.facilityMonthlyScheduleImage.delete({ where: { id: existing.id } });
   await removeScheduleImage(existing.filePath);
 
-  return NextResponse.json({ ok: true, deleted: true });
+  return NextResponse.json({ ok: true, deleted: true, slot });
 }
-

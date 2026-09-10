@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { formatDateYmdJapan } from "@/lib/datetime-japan";
 import { NewsletterGalleryClient } from "@/components/communication/newsletter-gallery-client";
-import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
+import { buildFacilityMediaFiles, groupMediaRowsByFacility } from "@/lib/facility-media-rows";
 
 function monthLabelJa(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -31,21 +31,20 @@ export default async function CommunicationPage({
     }),
     prisma.facilityMonthlyNewsletterImage.findMany({
       where: { month },
-      select: { facilityId: true, uploadedAt: true, filePath: true },
+      select: { facilityId: true, slot: true, uploadedAt: true, filePath: true },
+      orderBy: [{ facilityId: "asc" }, { slot: "asc" }],
     }),
   ]);
-  const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
+  const byFacility = groupMediaRowsByFacility(rows);
 
   const galleryRows = facilities
     .map((f) => {
-      const row = byFacility.get(f.id);
-      if (!row) return null;
+      const files = buildFacilityMediaFiles(byFacility.get(f.id) ?? [], month, "/api/newsletters/image");
+      if (files.length === 0) return null;
       return {
         facilityId: f.id,
         facilityName: f.name,
-        uploadedAtIso: row.uploadedAt.toISOString(),
-        mediaKind: mediaKindFromRelativePath(row.filePath),
-        imageUrl: `/api/newsletters/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(month)}`,
+        files,
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -58,7 +57,7 @@ export default async function CommunicationPage({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-100">
         <h1 className="text-lg font-bold text-slate-900">通信</h1>
         <p className="mt-1 text-xs text-slate-600">
-          事業所ごとの通信（PNG / JPEG / PDF）です。利用設定に関係なく、すべての事業所で登録されたものを表示します。
+          事業所ごとの通信（PNG / JPEG / PDF、最大2枚）です。利用設定に関係なく、すべての事業所で登録されたものを表示します。
         </p>
         <form method="GET" className="mt-3 flex items-center gap-2">
           <input

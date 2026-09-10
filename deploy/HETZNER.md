@@ -57,6 +57,7 @@ docker compose logs -f
 
 - nginx で `proxy_pass http://127.0.0.1:3000;`
 - `NEXTAUTH_URL` は **https** の URL に合わせる
+- 画像／PDF アップロード用に nginx で `client_max_body_size 3m;` を設定する（未設定だと既定の **1m** で拒否される。アプリ側上限は 2MB）
 
 ## 6. バックアップ
 

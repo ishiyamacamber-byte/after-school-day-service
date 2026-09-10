@@ -1,7 +1,14 @@
 export type MediaExt = "png" | "jpg" | "pdf";
 export type MediaKind = "image" | "pdf";
+export type MediaSlot = 1 | 2;
 
 const ALLOWED_EXTS = new Set<MediaExt>(["png", "jpg", "pdf"]);
+
+export function parseMediaSlot(raw: unknown): MediaSlot | null {
+  const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
+  if (n === 1 || n === 2) return n;
+  return null;
+}
 
 export function detectUploadMedia(file: File): { ext: MediaExt; contentType: string } | null {
   const name = file.name.toLowerCase();
@@ -37,4 +44,10 @@ export function mediaKindFromRelativePath(relativePath: string): MediaKind {
 
 export function mediaKindFromContentType(contentType: string): MediaKind {
   return contentType === "application/pdf" ? "pdf" : "image";
+}
+
+/** slot1 は後方互換で facilityId.ext、slot2 は facilityId-2.ext */
+export function buildFacilityMediaFileName(facilityId: string, slot: MediaSlot, ext: MediaExt): string {
+  if (slot === 1) return `${facilityId}.${ext}`;
+  return `${facilityId}-2.${ext}`;
 }

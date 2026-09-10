@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { FACILITY_LIST_ORDER_BY } from "@/lib/facility-order";
 import { formatDateYmdJapan } from "@/lib/datetime-japan";
 import { SchedulesAdminClient } from "@/components/admin/schedules-admin-client";
-import { mediaKindFromRelativePath } from "@/lib/facility-media-file";
+import { buildFacilityMediaFiles, groupMediaRowsByFacility } from "@/lib/facility-media-rows";
 
 export default async function AdminSchedulesPage() {
   const session = await getServerSession(authOptions);
@@ -18,29 +18,20 @@ export default async function AdminSchedulesPage() {
     prisma.facility.findMany({ select: { id: true, name: true }, orderBy: FACILITY_LIST_ORDER_BY }),
     prisma.facilityMonthlyScheduleImage.findMany({
       where: { month: initialMonth },
-      select: { facilityId: true, uploadedAt: true, uploadedById: true, filePath: true },
+      select: { facilityId: true, slot: true, uploadedAt: true, uploadedById: true, filePath: true },
+      orderBy: [{ facilityId: "asc" }, { slot: "asc" }],
     }),
   ]);
-  const byFacility = new Map(rows.map((r) => [r.facilityId, r]));
+  const byFacility = groupMediaRowsByFacility(rows);
 
   return (
     <SchedulesAdminClient
       initialMonth={initialMonth}
-      initialRows={facilities.map((f) => {
-        const current = byFacility.get(f.id);
-        return {
-          facilityId: f.id,
-          facilityName: f.name,
-          hasImage: !!current,
-          uploadedAtIso: current?.uploadedAt.toISOString() ?? null,
-          uploadedById: current?.uploadedById ?? null,
-          mediaKind: current ? mediaKindFromRelativePath(current.filePath) : null,
-          imageUrl: current
-            ? `/api/schedules/image?facilityId=${encodeURIComponent(f.id)}&month=${encodeURIComponent(initialMonth)}`
-            : null,
-        };
-      })}
+      initialRows={facilities.map((f) => ({
+        facilityId: f.id,
+        facilityName: f.name,
+        files: buildFacilityMediaFiles(byFacility.get(f.id) ?? [], initialMonth, "/api/schedules/image"),
+      }))}
     />
   );
 }
-

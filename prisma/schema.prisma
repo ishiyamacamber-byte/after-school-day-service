@@ -105,11 +105,13 @@ model ApplicationAdminEditLog {
   @@map("application_admin_edit_logs")
 }
 
-/// 事業所ごとの月別予定表ファイル（PNG / JPEG / PDF）
+/// 事業所ごとの月別予定表ファイル（PNG / JPEG / PDF、最大2枠）
 model FacilityMonthlyScheduleImage {
   id           String   @id @default(cuid())
   facilityId   String   @map("facility_id")
   month        String
+  /// 1=本体、2=追加
+  slot         Int      @default(1)
   filePath     String   @map("file_path")
   uploadedAt   DateTime @default(now()) @map("uploaded_at")
   uploadedById String   @map("uploaded_by_id")
@@ -117,17 +119,19 @@ model FacilityMonthlyScheduleImage {
   facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
   uploadedBy User     @relation("ScheduleImageUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
 
-  @@unique([facilityId, month])
+  @@unique([facilityId, month, slot])
   @@index([month])
   @@index([uploadedAt])
   @@map("facility_monthly_schedule_images")
 }
 
-/// 事業所ごとの月別通信ファイル（PNG / JPEG / PDF）
+/// 事業所ごとの月別通信ファイル（PNG / JPEG / PDF、最大2枠）
 model FacilityMonthlyNewsletterImage {
   id           String   @id @default(cuid())
   facilityId   String   @map("facility_id")
   month        String
+  /// 1=本体、2=追加
+  slot         Int      @default(1)
   filePath     String   @map("file_path")
   uploadedAt   DateTime @default(now()) @map("uploaded_at")
   uploadedById String   @map("uploaded_by_id")
@@ -135,7 +139,7 @@ model FacilityMonthlyNewsletterImage {
   facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
   uploadedBy User     @relation("NewsletterImageUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
 
-  @@unique([facilityId, month])
+  @@unique([facilityId, month, slot])
   @@index([month])
   @@index([uploadedAt])
   @@map("facility_monthly_newsletter_images")
