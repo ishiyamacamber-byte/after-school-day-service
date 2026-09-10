@@ -2,11 +2,15 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { detectUploadMedia, parseMediaSlot } from "@/lib/facility-media-file";
+import { parseMediaSlot, resolveUploadMedia } from "@/lib/facility-media-file";
 import { removeNewsletterImage, writeNewsletterImage } from "@/lib/newsletter-image-storage";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+function isUploadFile(value: FormDataEntryValue | null): value is File {
+  return !!value && typeof value === "object" && typeof (value as Blob).arrayBuffer === "function";
+}
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -20,12 +24,8 @@ export async function POST(req: Request) {
   const slot = parseMediaSlot(form.get("slot") ?? "1") ?? 1;
   const file = form.get("file");
 
-  if (!(file instanceof File) || !facilityId || !MONTH_RE.test(month)) {
+  if (!isUploadFile(file) || !facilityId || !MONTH_RE.test(month)) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
-  }
-  const media = detectUploadMedia(file);
-  if (!media) {
-    return NextResponse.json({ error: "file_type_not_allowed" }, { status: 400 });
   }
   if (file.size <= 0) {
     return NextResponse.json({ error: "empty_file" }, { status: 400 });
@@ -40,6 +40,14 @@ export async function POST(req: Request) {
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
+  const media = resolveUploadMedia(
+    { name: "name" in file ? String(file.name ?? "") : "", type: file.type ?? "" },
+    bytes
+  );
+  if (!media) {
+    return NextResponse.json({ error: "file_type_not_allowed" }, { status: 400 });
+  }
+
   const nextFilePath = await writeNewsletterImage(facilityId, month, bytes, media.ext, slot);
 
   try {

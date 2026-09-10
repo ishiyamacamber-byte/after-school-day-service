@@ -17,7 +17,7 @@ type Row = {
   files: MediaFile[];
 };
 
-const ACCEPT = "image/png,image/jpeg,.png,.jpg,.jpeg,application/pdf,.pdf";
+const ACCEPT = ".png,.jpg,.jpeg,.jfif,.pdf,image/png,image/jpeg,application/pdf";
 
 function fileKey(facilityId: string, slot: MediaSlot) {
   return `${facilityId}:${slot}`;
@@ -177,17 +177,20 @@ export function NewslettersAdminClient({
         )}
 
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            type="file"
-            accept={ACCEPT}
-            onChange={(e) =>
-              setFileByKey((prev) => ({
-                ...prev,
-                [key]: e.target.files?.[0] ?? null,
-              }))
-            }
-            className="w-full text-sm"
-          />
+          <div className="w-full">
+            <input
+              type="file"
+              accept={ACCEPT}
+              onChange={(e) =>
+                setFileByKey((prev) => ({
+                  ...prev,
+                  [key]: e.target.files?.[0] ?? null,
+                }))
+              }
+              className="w-full text-sm"
+            />
+            <p className="mt-1 text-[11px] text-slate-500">対応形式: PNG / JPEG / PDF（2MBまで）</p>
+          </div>
           <button
             type="button"
             disabled={busy || !previewFile}
